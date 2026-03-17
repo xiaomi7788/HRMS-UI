@@ -1,0 +1,102 @@
+/* 全局 SCSS 样式 */
+
+// 引入 Element Plus 的基础样式
+@use "element-plus/theme-chalk/src/index.scss" as *;
+
+// 定义 Element Plus 的主题变量 (示例，可根据若依框架的实际主题进行调整)
+$color-primary: #304156; // 若依主色调，通常是深色系
+$color-success: #13ce66;
+$color-warning: #ffba00;
+$color-danger: #ff4949;
+$color-info: #506176;
+
+// 覆盖 Element Plus 的默认变量
+:root {
+  --el-color-primary: #{$color-primary};
+  --el-color-success: #{$color-success};
+  --el-color-warning: #{$color-warning};
+  --el-color-danger: #{$color-danger};
+  --el-color-info: #{$color-info};
+}
+
+// 可以在这里添加若依框架特有的全局样式，例如：
+// - 字体设置
+// - 滚动条样式
+// - 页面过渡动画
+// - 常用工具类
+
+// 示例：调整滚动条样式 (若依框架可能有的样式)
+// ::-webkit-scrollbar {
+//   width: 8px;
+//   height: 8px;
+// }
+// ::-webkit-scrollbar-thumb {
+//   background-color: #c0c0c0;
+//   border-radius: 4px;
+// }
+// ::-webkit-scrollbar-track {
+//   background-color: #f0f0f0;
+// }
+
+// 示例：全局过渡动画 (若依框架可能有的动画)
+// .fade-transform-leave-active,
+// .fade-transform-enter-active {
+//   transition: all .5s;
+// }
+// .fade-transform-enter-from {
+//   opacity: 0;
+//   transform: translateX(-30px);
+// }
+// .fade-transform-leave-to {
+//   opacity: 0;
+//   transform: translateX(30px);
+// }
+
+// 可以在这里添加其他全局样式，例如：
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+}
+
+.common-layout {
+  height: 100%;
+  width: 100%;
+}
+
+/* Element Plus 组件样式覆盖 */
+.el-card {
+  border-radius: 4px;
+  border: 1px solid #e6ebf5;
+  background-color: #fff;
+  overflow: hidden;
+  color: #303133;
+  transition: .3s;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.el-table {
+  font-size: 14px;
+}
+
+.el-button {
+  border-radius: 4px;
+}
+
+.el-form--inline .el-select,
+.el-form--inline .el-select-v2,
+.search-filter-section .el-select,
+.search-filter-section .el-select-v2 {
+  min-width: 180px;
+}
+
+.el-form--inline .el-select__wrapper,
+.search-filter-section .el-select__wrapper {
+  min-width: 180px;
+}
+
+/* 提高 Element Plus 浮层组件的 z-index */
+.el-popper {
+  z-index: 30000 !important; // 确保浮层在大多数情况下都显示在最上层
+}
