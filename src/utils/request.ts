@@ -9,7 +9,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 // 响应数据结构（根据实际后端返回格式调整）
 export interface ApiResponse<T = unknown> {
   code: number
-  message: string
+  msg: string
   data: T
 }
 
@@ -25,10 +25,10 @@ const service: AxiosInstance = axios.create({
 // ---- 请求拦截器 ----
 service.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // 自动携带 token
+    // 自动携带 token - Sa-Token 使用 Sat-Token 头
     const token = localStorage.getItem('hrm_token')
     if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`
+      config.headers['Sat-Token'] = token
     }
     return config
   },
@@ -41,15 +41,15 @@ service.interceptors.request.use(
 // ---- 响应拦截器 ----
 service.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
-    const { code, message, data } = response.data
+    const res = response.data
 
     // 业务逻辑成功
-    if (code === 200 || code === 0) {
-      return data as unknown as AxiosResponse
+    if (res.code === 200 || res.code === 0) {
+      return res.data as unknown as AxiosResponse
     }
 
     // token 过期或未登录
-    if (code === 401) {
+    if (res.code === 401) {
       ElMessageBox.confirm('登录已过期，请重新登录', '提示', {
         confirmButtonText: '重新登录',
         cancelButtonText: '取消',
@@ -58,14 +58,20 @@ service.interceptors.response.use(
         localStorage.removeItem('hrm_token')
         window.location.href = '/login'
       })
-      return Promise.reject(new Error(message || '未授权'))
+      return Promise.reject(new Error(res.msg || '未授权'))
     }
 
     // 其他业务错误
-    ElMessage.error(message || '请求失败')
-    return Promise.reject(new Error(message || '请求失败'))
+    ElMessage.error(res.msg || '请求失败')
+    return Promise.reject(new Error(res.msg || '请求失败'))
   },
   (error) => {
+    // 网络错误（服务器未响应）
+    if (!error.response) {
+      ElMessage.error('网络异常，请检查后端服务是否启动')
+      return Promise.reject(error)
+    }
+
     // HTTP 错误状态码处理
     const status = error.response?.status
     const messageMap: Record<number, string> = {

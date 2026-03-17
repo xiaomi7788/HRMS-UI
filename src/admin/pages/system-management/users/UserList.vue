@@ -9,93 +9,173 @@
 
       <div class="search-filter-section">
         <el-input
-          v-model="searchQuery"
-          placeholder="搜索用户名或邮箱"
+          v-model="keyword"
+          placeholder="搜索用户名、姓名、手机号"
           clearable
-          style="width: 200px; margin-right: 10px;"
-          @clear="handleSearch"
-          @keyup.enter="handleSearch"
+          style="width: 250px; margin-right: 10px;"
+          @clear="loadUserList"
+          @keyup.enter="loadUserList"
         />
-        <el-select
-          v-model="filterStatus"
-          placeholder="筛选状态"
-          style="width: 120px; margin-right: 10px;"
-          @change="handleFilter"
-        >
-          <el-option label="所有" value="所有" />
-          <el-option label="启用" value="启用" />
-          <el-option label="禁用" value="禁用" />
-        </el-select>
-        <el-button type="primary" @click="handleSearch">查询</el-button>
-        <el-button type="success" @click="addUser">新增用户</el-button>
+        <el-button type="primary" @click="loadUserList">查询</el-button>
+        <el-button type="success" @click="handleAdd">新增用户</el-button>
       </div>
 
-      <el-table :data="paginatedUsers" style="width: 100%; margin-top: 20px;" border>
-        <el-table-column prop="id" label="ID" />
-        <el-table-column prop="username" label="用户名" />
-        <el-table-column prop="email" label="邮箱" />
-        <el-table-column prop="status" label="状态">
-          <template #default="scope">
-            <el-tag :type="scope.row.status === '启用' ? 'success' : 'danger'">
-              {{ scope.row.status }}
+      <el-table :data="userList" style="width: 100%; margin-top: 20px;" border>
+        <el-table-column prop="id" label="用户ID" width="80" />
+        <el-table-column prop="username" label="用户名" width="120" />
+        <el-table-column prop="realName" label="真实姓名" width="100" />
+        <el-table-column prop="email" label="邮箱" width="180" />
+        <el-table-column prop="phone" label="手机号" width="120" />
+        <el-table-column label="角色" width="180">
+          <template #default="{ row }">
+            <el-tag v-for="role in row.roles" :key="role" size="small" style="margin-right: 5px;">
+              {{ role }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="scope">
-            <el-button
-              size="small"
-              :type="scope.row.status === '启用' ? 'warning' : 'success'"
-              @click="toggleUserStatus(scope.row.id)"
-            >
-              {{ scope.row.status === '启用' ? '禁用' : '启用' }}
-            </el-button>
-            <el-button size="small" @click="editUser(scope.row.id)">编辑</el-button>
-            <el-button size="small" type="danger" @click="deleteUser(scope.row.id)">删除</el-button>
+        <el-table-column label="状态" width="80">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small">
+              {{ row.status === 1 ? '启用' : '禁用' }}
+            </el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="createTime" label="创建时间" width="180" />
+        <el-table-column label="操作" width="320" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button size="small" @click="handleAssignRoles(row)">分配角色</el-button>
+            <el-button size="small" type="warning" @click="handleResetPassword(row)">重置密码</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <el-empty description="暂无数据" />
+        </template>
       </el-table>
 
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
-        :small="false"
-        :disabled="false"
-        :background="true"
-        layout="total, sizes, prev, pager, next, jumper"
-        :total="totalUsers"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-        style="margin-top: 20px; justify-content: flex-end;"
-      />
+      <div v-if="total > 0" style="display: flex; justify-content: flex-end; margin-top: 20px;">
+        <el-pagination
+          v-model:current-page="pageNum"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          background
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="total"
+          @current-change="loadUserList"
+          @size-change="loadUserList"
+        />
+      </div>
     </el-card>
 
-    <!-- 新增/编辑用户的对话框 -->
+    <!-- 新增/编辑用户对话框 -->
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="50%"
+      width="600px"
       :before-close="handleCloseDialog"
     >
-      <el-form :model="currentEditingUser" label-width="80px">
-        <el-form-item label="用户名">
-          <el-input v-model="currentEditingUser.username"></el-input>
+      <el-form
+        ref="userFormRef"
+        :model="currentUser"
+        :rules="userRules"
+        label-width="100px"
+      >
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="currentUser.username" placeholder="请输入用户名" />
         </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="currentEditingUser.email"></el-input>
+        <el-form-item label="密码" prop="password" v-if="!currentUser.id">
+          <el-input
+            v-model="currentUser.password"
+            type="password"
+            placeholder="请输入密码"
+            show-password
+          />
         </el-form-item>
-        <el-form-item label="状态">
-          <el-radio-group v-model="currentEditingUser.status">
-            <el-radio label="启用">启用</el-radio>
-            <el-radio label="禁用">禁用</el-radio>
+        <el-form-item label="真实姓名" prop="realName">
+          <el-input v-model="currentUser.realName" placeholder="请输入真实姓名" />
+        </el-form-item>
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="currentUser.email" placeholder="请输入邮箱" />
+        </el-form-item>
+        <el-form-item label="手机号" prop="phone">
+          <el-input v-model="currentUser.phone" placeholder="请输入手机号" />
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-radio-group v-model="currentUser.status">
+            <el-radio :value="1">启用</el-radio>
+            <el-radio :value="0">禁用</el-radio>
           </el-radio-group>
+        </el-form-item>
+        <el-form-item label="关联员工ID">
+          <el-input-number v-model="currentUser.employeeId" :min="0" />
         </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="handleCloseDialog">取消</el-button>
-          <el-button type="primary" @click="handleSubmit">保存</el-button>
+          <el-button type="primary" @click="handleSave">保存</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 分配角色对话框 -->
+    <el-dialog
+      v-model="roleDialogVisible"
+      title="分配角色"
+      width="500px"
+      :before-close="handleCloseRoleDialog"
+    >
+      <el-checkbox-group v-model="selectedRoleIds">
+        <el-checkbox
+          v-for="role in allRoles"
+          :key="role.id"
+          :value="role.id"
+          :label="role.roleName"
+        />
+      </el-checkbox-group>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="handleCloseRoleDialog">取消</el-button>
+          <el-button type="primary" @click="handleSaveRoles">保存</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 重置密码对话框 -->
+    <el-dialog
+      v-model="passwordDialogVisible"
+      title="重置密码"
+      width="400px"
+      :before-close="handleClosePasswordDialog"
+    >
+      <el-form
+        ref="passwordFormRef"
+        :model="passwordForm"
+        :rules="passwordRules"
+        label-width="80px"
+      >
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input
+            v-model="passwordForm.newPassword"
+            type="password"
+            placeholder="请输入新密码"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input
+            v-model="passwordForm.confirmPassword"
+            type="password"
+            placeholder="请再次输入密码"
+            show-password
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="handleClosePasswordDialog">取消</el-button>
+          <el-button type="primary" @click="handleSavePassword">保存</el-button>
         </span>
       </template>
     </el-dialog>
@@ -103,172 +183,254 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import {
+  getUserPage,
+  createUser,
+  updateUser,
+  deleteUser,
+  getUserRoles,
+  assignUserRoles,
+  resetPassword,
+  type SysUser,
+  type PageResult
+} from '@/api/user'
+import { getRoleList, type SysRole as RoleType } from '@/api/role'
 
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  status: '启用' | '禁用';
+const userList = ref<SysUser[]>([])
+const keyword = ref('')
+const pageNum = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+
+const dialogVisible = ref(false)
+const dialogTitle = ref('')
+const currentUser = reactive<SysUser>({
+  username: '',
+  realName: '',
+  email: '',
+  phone: '',
+  status: 1,
+  employeeId: undefined,
+  roleIds: []
+})
+
+const userFormRef = ref<FormInstance>()
+const userRules: FormRules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 3, max: 32, message: '用户名长度3-32位', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少6位', trigger: 'blur' }
+  ],
+  realName: [
+    { required: true, message: '请输入真实姓名', trigger: 'blur' }
+  ],
+  email: [
+    { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+  ],
+  phone: [
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+  ]
 }
 
-const users = ref<User[]>([
-  { id: 1, username: 'admin', email: 'admin@example.com', status: '启用' },
-  { id: 2, username: 'zhangsan', email: 'zhangsan@example.com', status: '禁用' },
-  { id: 3, username: 'lisi', email: 'lisi@example.com', status: '启用' },
-  { id: 4, username: 'wangwu', email: 'wangwu@example.com', status: '禁用' },
-  { id: 5, username: 'zhaoliu', email: 'zhaoliu@example.com', status: '启用' },
-  { id: 6, username: 'qianqi', email: 'qianqi@example.com', status: '启用' },
-  { id: 7, username: 'sunba', email: 'sunba@example.com', status: '禁用' },
-  { id: 8, username: 'zhoujiu', email: 'zhoujiu@example.com', status: '启用' },
-  { id: 9, username: 'wushi', email: 'wushi@example.com', status: '禁用' },
-  { id: 10, username: 'zhengyi', email: 'zhengyi@example.com', status: '启用' },
-  { id: 11, username: 'chener', email: 'chener@example.com', status: '启用' },
-  { id: 12, username: 'liusan', email: 'liusan@example.com', status: '禁用' },
-]);
+const roleDialogVisible = ref(false)
+const selectedRoleIds = ref<number[]>([])
+const allRoles = ref<RoleType[]>([])
+const currentUserId = ref<number>(0)
 
-const searchQuery = ref('');
-const filterStatus = ref('所有');
-const currentPage = ref(1);
-const pageSize = ref(10);
-const dialogVisible = ref(false);
-const dialogTitle = ref('');
-const currentEditingUser = ref<User>({
-  id: 0,
-  username: '',
-  email: '',
-  status: '启用',
-});
-
-const filteredUsers = computed(() => {
-  let result = users.value;
-  if (filterStatus.value !== '所有') {
-    result = result.filter(user => user.status === filterStatus.value);
-  }
-  if (searchQuery.value) {
-    result = result.filter(user =>
-      user.username.includes(searchQuery.value) || user.email.includes(searchQuery.value)
-    );
-  }
-  return result;
-});
-
-const totalUsers = computed(() => filteredUsers.value.length);
-
-const paginatedUsers = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value;
-  const end = start + pageSize.value;
-  return filteredUsers.value.slice(start, end);
-});
-
-const handleSearch = () => {
-  currentPage.value = 1; // 搜索时重置到第一页
-};
-
-const handleFilter = () => {
-  currentPage.value = 1; // 筛选时重置到第一页
-};
-
-const handleSizeChange = (val: number) => {
-  pageSize.value = val;
-  currentPage.value = 1; // 改变每页大小时重置到第一页
-};
-
-const handleCurrentChange = (val: number) => {
-  currentPage.value = val;
-};
-
-const toggleUserStatus = (userId: number) => {
-  const user = users.value.find(u => u.id === userId);
-  if (user) {
-    user.status = user.status === '启用' ? '禁用' : '启用';
-    ElMessage.success(`${user.username} 已${user.status}`);
-  }
-};
-
-const addUser = () => {
-  dialogTitle.value = '新增用户';
-  currentEditingUser.value = {
-    id: 0,
-    username: '',
-    email: '',
-    status: '启用',
-  };
-  dialogVisible.value = true;
-};
-
-const editUser = (userId: number) => {
-  dialogTitle.value = '编辑用户';
-  const userToEdit = users.value.find(u => u.id === userId);
-  if (userToEdit) {
-    currentEditingUser.value = { ...userToEdit };
-    dialogVisible.value = true;
-  }
-};
-
-const deleteUser = (userId: number) => {
-  ElMessageBox.confirm('此操作将永久删除该用户, 是否继续?', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning',
-  })
-    .then(() => {
-      const index = users.value.findIndex(u => u.id === userId);
-      if (index !== -1) {
-        users.value.splice(index, 1);
-        ElMessage.success('删除成功!');
-        // 重新计算分页，确保删除后页面显示正确
-        handleSearch();
-      }
-    })
-    .catch(() => {
-      ElMessage.info('已取消删除');
-    });
-};
-
-const handleSubmit = () => {
-  if (currentEditingUser.value.id === 0) {
-    // 新增用户
-    const newId = Math.max(...users.value.map(u => u.id)) + 1;
-    users.value.push({ ...currentEditingUser.value, id: newId });
-    ElMessage.success('新增用户成功!');
-  } else {
-    // 编辑用户
-    const index = users.value.findIndex(u => u.id === currentEditingUser.value.id);
-    if (index !== -1) {
-      users.value[index] = { ...currentEditingUser.value };
-      ElMessage.success('编辑用户成功!');
+const passwordDialogVisible = ref(false)
+const passwordFormRef = ref<FormInstance>()
+const passwordForm = reactive({
+  newPassword: '',
+  confirmPassword: ''
+})
+const passwordRules: FormRules = {
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, message: '密码至少6位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入密码', trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (value !== passwordForm.newPassword) {
+          callback(new Error('两次输入密码不一致'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
     }
+  ]
+}
+
+const loadUserList = async () => {
+  try {
+    const res: PageResult<SysUser> = await getUserPage({
+      pageNum: pageNum.value,
+      pageSize: pageSize.value,
+      keyword: keyword.value || undefined
+    })
+    userList.value = res.records || []
+    total.value = Number(res.total || 0)
+  } catch (error) {
+    console.error('加载用户列表失败:', error)
   }
-  dialogVisible.value = false;
-  // 重新计算分页，确保新增/编辑后页面显示正确
-  handleSearch();
-};
+}
+
+const handleAdd = () => {
+  dialogTitle.value = '新增用户'
+  Object.assign(currentUser, {
+    username: '',
+    password: '',
+    realName: '',
+    email: '',
+    phone: '',
+    status: 1,
+    employeeId: undefined,
+    roleIds: []
+  })
+  dialogVisible.value = true
+}
+
+const handleEdit = (row: SysUser) => {
+  dialogTitle.value = '编辑用户'
+  Object.assign(currentUser, {
+    id: row.id,
+    username: row.username,
+    password: '',
+    realName: row.realName,
+    email: row.email,
+    phone: row.phone,
+    status: row.status,
+    employeeId: row.employeeId,
+    roleIds: row.roleIds
+  })
+  dialogVisible.value = true
+}
+
+const handleSave = async () => {
+  if (!userFormRef.value) return
+  await userFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        if (currentUser.id) {
+          await updateUser(currentUser)
+          ElMessage.success('更新用户成功')
+        } else {
+          await createUser(currentUser)
+          ElMessage.success('新增用户成功')
+        }
+        dialogVisible.value = false
+        loadUserList()
+      } catch (error) {
+        console.error('保存用户失败:', error)
+      }
+    }
+  })
+}
 
 const handleCloseDialog = () => {
-  dialogVisible.value = false;
-};
+  dialogVisible.value = false
+  userFormRef.value?.resetFields()
+}
+
+const handleDelete = (row: SysUser) => {
+  ElMessageBox.confirm(`确定要删除用户 "${row.username}" 吗?`, '提示', {
+    type: 'warning'
+  }).then(async () => {
+    try {
+      await deleteUser(row.id!)
+      ElMessage.success('删除成功')
+      loadUserList()
+    } catch (error) {
+      console.error('删除用户失败:', error)
+    }
+  }).catch(() => {})
+}
+
+const handleAssignRoles = async (row: SysUser) => {
+  currentUserId.value = row.id!
+  try {
+    const roleIds = await getUserRoles(row.id!)
+    selectedRoleIds.value = roleIds
+    roleDialogVisible.value = true
+  } catch (error) {
+    console.error('获取用户角色失败:', error)
+  }
+}
+
+const handleSaveRoles = async () => {
+  try {
+    await assignUserRoles(currentUserId.value, selectedRoleIds.value)
+    ElMessage.success('分配角色成功')
+    roleDialogVisible.value = false
+    loadUserList()
+  } catch (error) {
+    console.error('分配角色失败:', error)
+  }
+}
+
+const handleCloseRoleDialog = () => {
+  roleDialogVisible.value = false
+}
+
+const handleResetPassword = (row: SysUser) => {
+  currentUserId.value = row.id!
+  passwordForm.newPassword = ''
+  passwordForm.confirmPassword = ''
+  passwordFormRef.value?.resetFields()
+  passwordDialogVisible.value = true
+}
+
+const handleSavePassword = async () => {
+  if (!passwordFormRef.value) return
+  await passwordFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        await resetPassword(currentUserId.value, passwordForm.newPassword)
+        ElMessage.success('重置密码成功')
+        passwordDialogVisible.value = false
+      } catch (error) {
+        console.error('重置密码失败:', error)
+      }
+    }
+  })
+}
+
+const handleClosePasswordDialog = () => {
+  passwordDialogVisible.value = false
+  passwordFormRef.value?.resetFields()
+}
+
+const loadAllRoles = async () => {
+  try {
+    allRoles.value = await getRoleList()
+  } catch (error) {
+    console.error('加载角色列表失败:', error)
+  }
+}
+
+onMounted(() => {
+  loadUserList()
+  loadAllRoles()
+})
 </script>
 
 <style scoped>
 .user-list-container {
   padding: 20px;
 }
-
 .card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  font-size: 18px;
+  font-weight: bold;
 }
-
 .search-filter-section {
   display: flex;
   align-items: center;
-  margin-bottom: 20px;
-}
-
-.dialog-footer {
-  text-align: right;
 }
 </style>

@@ -12,6 +12,12 @@
         <el-form-item prop="password">
           <el-input v-model="form.password" type="password" placeholder="请输入密码" :prefix-icon="Lock" show-password size="large" />
         </el-form-item>
+        <el-form-item prop="captcha">
+          <div class="captcha-wrapper">
+            <el-input v-model="form.captcha" placeholder="请输入验证码" :prefix-icon="CircleCheck" size="large" style="flex: 1;" />
+            <img :src="captchaImage" alt="验证码" class="captcha-img" @click="fetchCaptcha" title="点击刷新验证码" />
+          </div>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" native-type="submit" :loading="loading" style="width: 100%;" size="large">登录</el-button>
         </el-form-item>
@@ -21,19 +27,14 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import type { FormInstance, FormRules } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
-
-const mockUsers = [
-  { username: 'user', password: '123', role: 'user', token: 'user_token', avatar: 'https://cube.elemecdn.com/0/88/03b0dff359653ee253905facf436ff86.jpeg' },
-  { username: 'admin', password: '123', role: 'admin', token: 'admin_token', avatar: 'https://cube.elemecdn.com/9/c2/f0ee84449c283d713a9653e751e45.jpeg' },
-  { username: 'superadmin', password: '123', role: 'superadmin', token: 'superadmin_token', avatar: 'https://cube.elemecdn.com/3/7c/3ed6826170ee4e3fdeb8e64338717jpeg.jpeg' },
-  { username: 'manager', password: '123', role: 'manager', token: 'manager_token', avatar: 'https://cube.elemecdn.com/6/94/4cb3355d2d8e5f227d0d3f010e688jpeg.jpeg' },
-];
+import { User, Lock, CircleCheck } from '@element-plus/icons-vue'
+import { getCaptcha, login } from '@/api/auth'
+import { getRoleList } from '@/api/role'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -43,12 +44,27 @@ const loading = ref(false)
 const form = reactive({
   username: '',
   password: '',
+  captcha: '',
+  captchaKey: '',
 })
+
+const captchaImage = ref('')
 
 const rules = reactive<FormRules>({
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  captcha: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
 })
+
+async function fetchCaptcha() {
+  try {
+    const data = await getCaptcha()
+    form.captchaKey = data.key
+    captchaImage.value = data.image
+  } catch (error) {
+    console.error('获取验证码失败:', error)
+  }
+}
 
 async function handleLogin() {
   if (!loginForm.value) return
@@ -57,31 +73,61 @@ async function handleLogin() {
 
   loading.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const result = await login({
+      username: form.username,
+      password: form.password,
+      captcha: form.captcha,
+      captchaKey: form.captchaKey,
+    })
 
-    const user = mockUsers.find(
-      u => u.username === form.username && u.password === form.password
-    )
+    console.log('登录返回结果:', result)
+    console.log('result.roles:', result.roles)
 
-    if (user) {
-      userStore.setUserInfo({ username: user.username, role: user.role, avatar: user.avatar })
-      ElMessage.success('登录成功')
-      if (user.role === 'admin') {
-        router.push('/admin')
-      } else if (user.role === 'superadmin') {
-        router.push('/superadmin')
-      } else {
-        router.push('/user')
-      }
-    } else {
-      ElMessage.error('登录失败，请检查用户名和密码')
+    localStorage.setItem('hrm_token', result.token)
+    userStore.setUserInfo({
+      id: result.userId,
+      username: result.username,
+      nickname: result.realName,
+      avatar: result.avatar,
+      roles: result.roles,
+      role: result.roles?.[0] || 'user',
+      token: result.token,
+      roleId: result.roleId, // 角色ID
+    })
+
+    console.log('userStore.roles:', userStore.roles)
+    console.log('userStore.userInfo:', userStore.userInfo)
+
+    ElMessage.success('登录成功')
+
+    // 加载角色列表
+    try {
+      const roles = await getRoleList()
+      userStore.setRoleList(roles)
+    } catch (error) {
+      console.error('加载角色列表失败:', error)
     }
-  } catch {
-    ElMessage.error('登录失败，请检查用户名和密码')
+
+    // 简化逻辑：只要角色编码不是 EMPLOYEE 就跳转到管理端，否则跳转到用户端
+    const isEmployee = result.roles.some(role => role.toUpperCase() === 'EMPLOYEE')
+
+    if (isEmployee) {
+      router.push('/user')
+    } else {
+      router.push('/admin')
+    }
+  } catch (error) {
+    console.error('登录失败:', error)
+    fetchCaptcha()
+    form.captcha = ''
   } finally {
     loading.value = false
   }
 }
+
+onMounted(() => {
+  fetchCaptcha()
+})
 </script>
 
 <style scoped>
@@ -119,5 +165,19 @@ h1 {
   font-size: 24px;
   color: #333;
   margin: 0;
+}
+
+.captcha-wrapper {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.captcha-img {
+  width: 120px;
+  height: 40px;
+  cursor: pointer;
+  border-radius: 4px;
+  border: 1px solid #dcdfe6;
 }
 </style>

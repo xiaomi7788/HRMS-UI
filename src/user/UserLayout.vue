@@ -19,68 +19,10 @@
             <el-icon><House /></el-icon>
             <span>个人中心</span>
           </el-menu-item>
-          <el-sub-menu index="self-service">
-            <template #title>
-              <el-icon><Service /></el-icon>
-              <span>员工自助服务</span>
-            </template>
-            <el-menu-item index="/user/self-service/salary-query">
-              <el-icon><Money /></el-icon>
-              <span>薪资查询</span>
-            </el-menu-item>
-            <el-menu-item index="/user/self-service/attendance-query">
-              <el-icon><Calendar /></el-icon>
-              <span>考勤查询</span>
-            </el-menu-item>
-            <el-menu-item index="/user/self-service/leave-overtime-apply">
-              <el-icon><DocumentAdd /></el-icon>
-              <span>请假/加班申请</span>
-            </el-menu-item>
-            <el-menu-item index="/user/self-service/personal-flow-center">
-              <el-icon><List /></el-icon>
-              <span>个人流程中心</span>
-            </el-menu-item>
-          </el-sub-menu>
-          <el-menu-item index="/user/training-center">
-            <el-icon><Reading /></el-icon>
-            <span>培训中心</span>
-          </el-menu-item>
-          <el-sub-menu index="info-center">
-            <template #title>
-              <el-icon><Bell /></el-icon>
-              <span>信息中心</span>
-            </template>
-            <el-menu-item index="/user/company-directory">
-              <el-icon><User /></el-icon>
-              <span>公司通讯录</span>
-            </el-menu-item>
-            <el-menu-item index="/user/announcement-notification">
-              <el-icon><Bell /></el-icon>
-              <span>公告通知中心</span>
-            </el-menu-item>
-          </el-sub-menu>
-          <el-sub-menu index="welfare-care">
-            <template #title>
-              <el-icon><Present /></el-icon>
-              <span>关怀福利</span>
-            </template>
-            <el-menu-item index="/user/employee-care-reminders">
-              <el-icon><Present /></el-icon>
-              <span>员工关怀提醒</span>
-            </el-menu-item>
-            <el-menu-item index="/user/welfare/welfare-item-view">
-              <el-icon><Present /></el-icon>
-              <span>福利项目查看</span>
-            </el-menu-item>
-            <el-menu-item index="/user/performance/my-performance">
-              <el-icon><TrendCharts /></el-icon>
-              <span>我的绩效</span>
-            </el-menu-item>
-          </el-sub-menu>
-          <el-menu-item index="/user/survey/employee-survey">
-            <el-icon><Document /></el-icon>
-            <span>员工调查与问卷</span>
-          </el-menu-item>
+
+          <!-- 动态菜单 -->
+          <DynamicMenu :menus="dynamicMenus" mode="horizontal" v-if="dynamicMenus.length > 0" />
+
           <!-- 部门经理附加功能 -->
           <el-sub-menu v-if="userStore.hasRole('manager')" index="manager-functions">
             <template #title>
@@ -139,29 +81,67 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useUiStore } from '@/stores/ui';
 import { ElMessage } from 'element-plus';
+import DynamicMenu from '@/components/DynamicMenu.vue';
+import { getRoleMenus, getAllMenus, type SysMenu } from '@/api/auth';
 import {
   House,
-  Service,
-  Money,
-  Calendar,
-  DocumentAdd,
-  List,
-  Reading,
-  User,
-  Bell,
-  Present,
   Management,
   UserFilled,
   TrendCharts,
   Connection,
-  ArrowDown,
-  Document,
 } from '@element-plus/icons-vue';
+
+// 匹配 DynamicMenu 组件的菜单类型
+interface MenuItem {
+  id: number
+  parentId: number | null
+  title: string
+  path: string
+  icon?: string
+  children?: MenuItem[]
+}
+
+// 将平铺菜单数据转换为树形结构
+function buildMenuTree(menus: SysMenu[]): MenuItem[] {
+  console.log('原始菜单数据:', menus)
+  const map = new Map<string, MenuItem>()
+  const roots: MenuItem[] = []
+
+  // 处理可能的字段名差异
+  menus.forEach(menu => {
+    const normalizedMenu: MenuItem = {
+      id: Number(menu.id),
+      parentId: menu.parentId ? Number(menu.parentId) : 0,
+      title: menu.menuName || menu.title || '未命名菜单',
+      path: menu.path || '',
+      icon: menu.icon,
+      children: []
+    }
+    map.set(String(menu.id), normalizedMenu)
+  })
+
+  menus.forEach(menu => {
+    const node = map.get(String(menu.id))!
+    const pid = menu.parentId ? String(menu.parentId) : '0'
+    if (pid === '0' || pid === 'null' || pid === null || pid === undefined) {
+      roots.push(node)
+    } else {
+      const parent = map.get(pid)
+      if (parent) {
+        parent.children = parent.children || []
+        parent.children.push(node)
+      }
+    }
+  })
+
+  console.log('转换后的菜单树:', roots)
+  return roots
+}
 
 const router = useRouter();
 const route = useRoute();
@@ -169,6 +149,110 @@ const userStore = useUserStore();
 const uiStore = useUiStore();
 
 const activeMenu = ref(route.path);
+const dynamicMenus = ref<MenuItem[]>([]);
+
+// 加载菜单
+async function loadMenus() {
+  try {
+    const userInfo = userStore.userInfo
+    const roles = userInfo?.roles || []
+
+    console.log('loadMenus - userInfo:', userInfo)
+    console.log('loadMenus - roles:', roles)
+
+    // 角色编码到ID的映射
+    // 1001:超级管理员, 1002:人事专员, 1003:部门经理, 1004:普通员工, 1005:财务专员
+    const roleIdMap: Record<string, number> = {
+      'user': 1004,
+      'ROLE_USER': 1004,
+      'USER': 1004,
+      'EMPLOYEE': 1004,
+      'manager': 1003,
+      'ROLE_MANAGER': 1003,
+      'MANAGER': 1003,
+      'hr': 1002,
+      'HR': 1002,
+      'finance': 1005,
+      'FINANCE': 1005,
+    }
+
+    // 从角色编码获取对应的角色ID
+    let roleId = 1004 // 默认普通员工
+
+    // 优先使用 userInfo 中的 roleId
+    if (userInfo?.roleId) {
+      roleId = userInfo.roleId
+      console.log('使用 userInfo.roleId:', roleId)
+    } else {
+      // 从 roles 数组中查找匹配的角色ID
+      for (const role of roles) {
+        if (roleIdMap[role] !== undefined) {
+          roleId = roleIdMap[role]
+          console.log('从 roles 映射 roleId:', role, '->', roleId)
+          break
+        }
+      }
+    }
+
+    console.log('获取用户端菜单，角色:', roles, '角色ID:', roleId)
+
+    // 获取所有菜单
+    let menus: SysMenu[] = []
+    try {
+      menus = await getAllMenus()
+      console.log('所有菜单原始数据:', menus)
+    } catch (error) {
+      console.warn('获取所有菜单失败，尝试获取角色菜单:', error)
+      try {
+        menus = await getRoleMenus(roleId)
+        console.log('角色菜单原始数据:', menus)
+      } catch (roleError) {
+        console.error('获取角色菜单也失败:', roleError)
+        menus = []
+      }
+    }
+
+    // 过滤用户端菜单
+    // 用户端菜单: 2008员工自助 及其子菜单 2081-2088
+    // 工作流用户端: 2092-2093
+    const userMenuIds = new Set([
+      // 员工自助顶级菜单
+      2008,
+      // 员工自助子菜单
+      2081, 2082, 2083, 2084, 2085, 2086, 2087, 2088,
+      // 工作流用户端
+      2092, 2093,
+    ])
+
+    // 过滤菜单: 只保留用户端菜单
+    const userMenus = menus.filter(menu => {
+      const menuId = Number(menu.id)
+      return userMenuIds.has(menuId) || menu.menuType === 2
+    })
+    console.log('过滤后的用户端菜单:', userMenus)
+
+    // 将平铺数据转换为树形结构
+    const menuTree = buildMenuTree(userMenus)
+    dynamicMenus.value = menuTree
+
+    // 转换为 SysMenu 类型存入 store（兼容老代码）
+    userStore.setMenus(menus as any)
+  } catch (error) {
+    console.error('获取菜单失败:', error)
+  }
+}
+
+onMounted(() => {
+  // 如果store中有菜单则使用，否则重新获取
+  if (userStore.menus.length > 0) {
+    const allMenus = userStore.menus as any
+    const userMenuIds = new Set([2008, 2081, 2082, 2083, 2084, 2085, 2086, 2087, 2088, 2092, 2093])
+    const userMenus = allMenus.filter((menu: any) => userMenuIds.has(menu.id) || menu.menuType === 2)
+    dynamicMenus.value = buildMenuTree(userMenus)
+  } else {
+    loadMenus()
+  }
+})
 
 watch(
   () => route.path,

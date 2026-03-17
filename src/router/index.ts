@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { useUiStore } from '@/stores/ui' // 引入 UI Store
+import { useUiStore } from '@/stores/ui'
 import { ElMessage } from 'element-plus'
+import { getRoleList } from '@/api/role'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -139,227 +140,104 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '管理仪表盘', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'system-management/users',
+        path: 'sys/user',
         name: 'UserList',
         component: () => import('@/admin/pages/system-management/users/UserList.vue'),
-        meta: { title: '用户列表', requiresAuth: true, roles: ['admin', 'superadmin'] },
+        meta: { title: '用户管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'system-management/roles',
+        path: 'sys/role',
         name: 'RoleList',
         component: () => import('@/admin/pages/system-management/roles/RoleList.vue'),
-        meta: { title: '角色列表', requiresAuth: true, roles: ['admin', 'superadmin'] },
+        meta: { title: '角色管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'system-management/menus',
+        path: 'sys/menu',
         name: 'MenuList',
         component: () => import('@/admin/pages/system-management/menus/MenuList.vue'),
         meta: { title: '菜单管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'organization-management/departments',
-        name: 'DepartmentList',
-        component: () => import('@/admin/pages/organization-management/departments/DepartmentList.vue'),
+        path: 'sys/log',
+        name: 'LogList',
+        component: () => import('@/admin/pages/system-management/logs/LogList.vue'),
+        meta: { title: '操作日志', requiresAuth: true, roles: ['admin', 'superadmin'] },
+      },
+      {
+        path: 'sys/workflow',
+        name: 'WorkflowTemplate',
+        component: () => import('@/admin/pages/system-management/workflow/WorkflowTemplate.vue'),
+        meta: { title: '审批流程模板', requiresAuth: true, roles: ['admin', 'superadmin'] },
+      },
+      {
+        path: 'attendance/schedule',
+        name: 'ScheduleList',
+        component: () => import('@/admin/pages/attendance/schedule/ScheduleList.vue'),
+        meta: { title: '排班管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
+      },
+      {
+        path: 'org/dept',
+        name: 'DeptList',
+        component: () => import('@/admin/pages/org/dept/DeptList.vue'),
         meta: { title: '部门管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'organization-management/positions',
+        path: 'org/position',
         name: 'PositionList',
-        component: () => import('@/admin/pages/organization-management/positions/PositionList.vue'),
+        component: () => import('@/admin/pages/org/position/PositionList.vue'),
         meta: { title: '岗位管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'employee-management/list',
+        path: 'org/employee',
         name: 'EmployeeList',
-        component: () => import('@/admin/pages/employee-management/EmployeeList.vue'),
-        meta: { title: '员工列表', requiresAuth: true, roles: ['admin', 'superadmin'] },
+        component: () => import('@/admin/pages/org/employee/EmployeeList.vue'),
+        meta: { title: '员工管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'employee-management/lifecycle',
-        name: 'EmployeeLifecycleManagement',
-        component: () => import('@/admin/pages/employee-management/EmployeeLifecycleManagement.vue'),
-        meta: { title: '员工入转调离', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'employee-management/contracts',
-        name: 'ContractManagement',
-        component: () => import('@/admin/pages/employee-management/ContractManagement.vue'),
+        path: 'org/contract',
+        name: 'ContractList',
+        component: () => import('@/admin/pages/org/contract/ContractList.vue'),
         meta: { title: '劳动合同管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'employee-management/movement-statistics',
-        name: 'PersonnelMovementStatistics',
-        component: () => import('@/admin/pages/employee-management/PersonnelMovementStatistics.vue'),
-        meta: { title: '人事异动统计', requiresAuth: true, roles: ['admin', 'superadmin'] },
+        path: 'org/talent',
+        name: 'TalentList',
+        component: () => import('@/admin/pages/org/talent/TalentList.vue'),
+        meta: { title: '人才梯队管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'employee-management/roster',
-        name: 'EmployeeRosterManagement',
-        component: () => import('@/admin/pages/employee-management/EmployeeRosterManagement.vue'),
-        meta: { title: '员工花名册', requiresAuth: true, roles: ['admin', 'superadmin'] },
+        path: 'org/contact',
+        name: 'ContactList',
+        component: () => import('@/admin/pages/org/contact/ContactList.vue'),
+        meta: { title: '通讯录', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'employee-management/succession-planning',
-        name: 'SuccessionPlanning',
-        component: () => import('@/admin/pages/employee-management/SuccessionPlanning.vue'),
-        meta: { title: '继任者计划', requiresAuth: true, roles: ['admin', 'superadmin'] },
+        path: 'recruit/job',
+        name: 'JobList',
+        component: () => import('@/admin/pages/recruit/job/JobList.vue'),
+        meta: { title: '招聘职位管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'recruitment-management/demand-list',
-        name: 'RecruitmentDemandList',
-        component: () => import('@/admin/pages/recruitment-management/RecruitmentDemandList.vue'),
-        meta: { title: '招聘需求管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
+        path: 'recruit/candidate',
+        name: 'CandidateList',
+        component: () => import('@/admin/pages/recruit/candidate/CandidateList.vue'),
+        meta: { title: '候选人库', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'recruitment-management/job-posting',
-        name: 'JobPostingManagement',
-        component: () => import('@/admin/pages/recruitment-management/JobPostingManagement.vue'),
-        meta: { title: '职位发布管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
+        path: 'recruit/interview',
+        name: 'InterviewList',
+        component: () => import('@/admin/pages/recruit/interview/InterviewList.vue'),
+        meta: { title: '安排面试', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
       {
-        path: 'recruitment-management/candidates',
-        name: 'CandidateManagement',
-        component: () => import('@/admin/pages/recruitment-management/CandidateManagement.vue'),
-        meta: { title: '候选人管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
+        path: 'recruit/offer',
+        name: 'OfferList',
+        component: () => import('@/admin/pages/recruit/offer/OfferList.vue'),
+        meta: { title: 'Offer管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
       },
-      {
-        path: 'recruitment-management/interviews',
-        name: 'InterviewManagement',
-        component: () => import('@/admin/pages/recruitment-management/InterviewManagement.vue'),
-        meta: { title: '面试管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'recruitment-management/evaluation-approval',
-        name: 'InterviewEvaluationApproval',
-        component: () => import('@/admin/pages/recruitment-management/InterviewEvaluationApproval.vue'),
-        meta: { title: '面试评价与审批', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'recruitment-management/offer-onboarding',
-        name: 'OfferOnboardingManagement',
-        component: () => import('@/admin/pages/recruitment-management/OfferOnboardingManagement.vue'),
-        meta: { title: 'Offer与入职管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'attendance-management/rule-config',
-        name: 'AttendanceRuleConfig',
-        component: () => import('@/admin/pages/attendance-management/AttendanceRuleConfig.vue'),
-        meta: { title: '考勤规则配置', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'attendance-management/data-processing',
-        name: 'AttendanceDataProcessing',
-        component: () => import('@/admin/pages/attendance-management/AttendanceDataProcessing.vue'),
-        meta: { title: '考勤数据处理', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'attendance-management/leave-management',
-        name: 'LeaveManagement',
-        component: () => import('@/admin/pages/attendance-management/LeaveManagement.vue'),
-        meta: { title: '假期管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'attendance-management/overtime-management',
-        name: 'OvertimeManagement',
-        component: () => import('@/admin/pages/attendance-management/OvertimeManagement.vue'),
-        meta: { title: '加班管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'attendance-management/monthly-report',
-        name: 'MonthlyAttendanceReport',
-        component: () => import('@/admin/pages/attendance-management/MonthlyAttendanceReport.vue'),
-        meta: { title: '月度考勤报表', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'payroll-management/structure-design',
-        name: 'PayrollStructureDesign',
-        component: () => import('@/admin/pages/payroll-management/PayrollStructureDesign.vue'),
-        meta: { title: '薪酬结构设计', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'payroll-management/monthly-calculation',
-        name: 'MonthlyPayrollCalculation',
-        component: () => import('@/admin/pages/payroll-management/MonthlyPayrollCalculation.vue'),
-        meta: { title: '月度薪酬核算', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'payroll-management/social-security-provident-fund',
-        name: 'SocialSecurityProvidentFundManagement',
-        component: () => import('@/admin/pages/payroll-management/SocialSecurityProvidentFundManagement.vue'),
-        meta: { title: '社保公积金管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'payroll-management/salary-adjustment-approval',
-        name: 'SalaryAdjustmentApproval',
-        component: () => import('@/admin/pages/payroll-management/SalaryAdjustmentApproval.vue'),
-        meta: { title: '薪酬调整审批', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'payroll-management/report-cost-analysis',
-        name: 'PayrollReportCostAnalysis',
-        component: () => import('@/admin/pages/payroll-management/PayrollReportCostAnalysis.vue'),
-        meta: { title: '薪酬报表与分析', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'payroll-management/benefit-management',
-        name: 'BenefitManagement',
-        component: () => import('@/admin/pages/payroll-management/BenefitManagement.vue'),
-        meta: { title: '福利项目管理', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'performance-management/plan-design',
-        name: 'PerformancePlanDesign',
-        component: () => import('@/admin/pages/performance-management/PerformancePlanDesign.vue'),
-        meta: { title: '绩效方案设计', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'performance-management/goal-setting',
-        name: 'PerformanceGoalSetting',
-        component: () => import('@/admin/pages/performance-management/PerformanceGoalSetting.vue'),
-        meta: { title: '绩效目标制定', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'performance-management/tracking-feedback',
-        name: 'PerformanceTrackingFeedback',
-        component: () => import('@/admin/pages/performance-management/PerformanceTrackingFeedback.vue'),
-        meta: { title: '绩效跟踪与反馈', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'performance-management/evaluation-calibration',
-        name: 'PerformanceEvaluationCalibration',
-        component: () => import('@/admin/pages/performance-management/PerformanceEvaluationCalibration.vue'),
-        meta: { title: '绩效评估与校准', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'performance-management/result-improvement',
-        name: 'PerformanceResultImprovement',
-        component: () => import('@/admin/pages/performance-management/PerformanceResultImprovement.vue'),
-        meta: { title: '绩效结果应用与改进', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'training-management/plan-form',
-        name: 'TrainingPlanForm',
-        component: () => import('@/admin/pages/training-management/TrainingPlanForm.vue'),
-        meta: { title: '培训计划制定', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'workflow-approval/process-design',
-        name: 'ApprovalProcessDesign',
-        component: () => import('@/admin/pages/workflow-approval/ApprovalProcessDesign.vue'),
-        meta: { title: '审批流程设计', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'data-reports-bi/hr-structure-analysis',
-        name: 'HumanResourceStructureAnalysis',
-        component: () => import('@/admin/pages/data-reports-bi/HumanResourceStructureAnalysis.vue'),
-        meta: { title: '人力结构分析', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
-      {
-        path: 'system-audit-logs/operation-log-list',
-        name: 'OperationLogList',
-        component: () => import('@/admin/pages/system-audit-logs/OperationLogList.vue'),
-        meta: { title: '操作日志记录', requiresAuth: true, roles: ['admin', 'superadmin'] },
-      },
+
+
+
     ],
   },
   // 404 页面
@@ -405,39 +283,72 @@ router.beforeEach(async (to, _from, next) => {
       await userStore.loadUserInfo()
       console.log('beforeEach: userStore.userInfo after loadUserInfo', userStore.userInfo);
     }
-    const userRole = userStore.userInfo?.role
-    console.log('beforeEach: userRole', userRole);
-    if (userRole === 'admin') {
-      next({ path: '/admin' })
-    } else if (userRole === 'superadmin') {
-      next({ path: '/superadmin' })
-    } else if (userRole === 'user' || userRole === 'manager') { // 将 manager 角色也重定向到用户端仪表盘
+    // 加载角色列表（如果未加载）
+    if (!userStore.roleList || userStore.roleList.length === 0) {
+      try {
+        const roles = await getRoleList()
+        userStore.setRoleList(roles)
+      } catch (error) {
+        console.error('加载角色列表失败:', error)
+      }
+    }
+    const userRoles = userStore.roles
+    console.log('beforeEach: userRoles', userRoles);
+    // 简化逻辑：只要角色编码不是 EMPLOYEE 就跳转到管理端，否则跳转到用户端
+    const isEmployee = userRoles.some(role => role.toUpperCase() === 'EMPLOYEE')
+    if (isEmployee) {
       next({ path: '/user' })
     } else {
-      next({ path: '/' }) // 默认跳转
+      next({ path: '/admin' })
     }
   } else if (requiresAuth && token) {
     // 已登录且需要权限的页面
     console.log('beforeEach: requiresAuth and token exists');
-    if (!userStore.userInfo?.role) {
+    if (!userStore.userInfo) {
       // 如果用户信息不存在，尝试从本地存储恢复或重新获取
-      console.log('beforeEach: userStore.userInfo.role is null, loading from localStorage');
+      console.log('beforeEach: userStore.userInfo is null, loading from localStorage');
       await userStore.loadUserInfo()
       console.log('beforeEach: userStore.userInfo after loadUserInfo', userStore.userInfo);
+    } else {
+      console.log('beforeEach: userStore.userInfo exists', userStore.userInfo);
     }
-    const userRole = userStore.userInfo?.role
+    // 加载角色列表（如果未加载）
+    if (!userStore.roleList || userStore.roleList.length === 0) {
+      try {
+        const roles = await getRoleList()
+        userStore.setRoleList(roles)
+      } catch (error) {
+        console.error('加载角色列表失败:', error)
+      }
+    }
+    const userRoles = userStore.roles
     const requiredRoles = to.meta?.roles as string[]
-    console.log('beforeEach: userRole', userRole);
+    console.log('beforeEach: userRoles', userRoles);
     console.log('beforeEach: requiredRoles', requiredRoles);
+    console.log('beforeEach: to.path', to.path);
+    console.log('beforeEach: userStore.userInfo', userStore.userInfo);
 
     if (requiredRoles && requiredRoles.length > 0) {
-      if (userRole && requiredRoles.includes(userRole)) {
-        console.log('beforeEach: role matched, next()');
-        next()
+      // 简化权限逻辑：只要不是 EMPLOYEE 角色就允许访问所有需要 admin/superadmin 权限的页面
+      // EMPLOYEE 只能访问需要 user 权限的页面
+      const isEmployee = userRoles.some(role => role.toUpperCase() === 'EMPLOYEE')
+
+      console.log('beforeEach: isEmployee', isEmployee);
+
+      if (isEmployee) {
+        // EMPLOYEE 只能访问用户端页面
+        const allowed = requiredRoles.includes('user')
+        console.log('beforeEach: EMPLOYEE user, allowed to access user pages only, allowed:', allowed);
+        if (allowed) {
+          next()
+        } else {
+          ElMessage.error('无权访问该页面！')
+          next({ path: '/' })
+        }
       } else {
-        ElMessage.error('无权访问该页面！')
-        console.log('beforeEach: role not matched, redirect to /');
-        next({ path: '/' }) // 无权限跳转到首页
+        // 非EMPLOYEE角色（ADMIN、HR、MANAGER、FINANCE等）可以访问所有管理端页面
+        console.log('beforeEach: non-EMPLOYEE user, allowed to access admin pages');
+        next()
       }
     } else {
       console.log('beforeEach: no specific roles required, next()');
