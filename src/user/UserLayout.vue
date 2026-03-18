@@ -15,13 +15,13 @@
           text-color="#bfcbd9"
           active-text-color="#409EFF"
         >
-          <el-menu-item index="/user">
+          <!-- <el-menu-item index="/user">
             <el-icon><House /></el-icon>
             <span>个人中心</span>
-          </el-menu-item>
+          </el-menu-item> -->
 
           <!-- 动态菜单 -->
-          <DynamicMenu :menus="dynamicMenus" mode="horizontal" v-if="dynamicMenus.length > 0" />
+          <DynamicMenu :menus="dynamicMenus" v-if="dynamicMenus.length > 0" />
 
           <!-- 部门经理附加功能 -->
           <el-sub-menu v-if="userStore.hasRole('manager')" index="manager-functions">
@@ -87,7 +87,7 @@ import { useUserStore } from '@/stores/user';
 import { useUiStore } from '@/stores/ui';
 import { ElMessage } from 'element-plus';
 import DynamicMenu from '@/components/DynamicMenu.vue';
-import { getRoleMenus, getAllMenus, type SysMenu } from '@/api/auth';
+import { getAllMenus, type SysMenu } from '@/api/auth';
 import {
   House,
   Management,
@@ -104,9 +104,10 @@ interface MenuItem {
   path: string
   icon?: string
   children?: MenuItem[]
+  menuType?: number
 }
 
-// 将平铺菜单数据转换为树形结构
+// 将平铺菜单数据转换为树形结构，并过滤掉没有子菜单的目录
 function buildMenuTree(menus: SysMenu[]): MenuItem[] {
   console.log('原始菜单数据:', menus)
   const map = new Map<string, MenuItem>()
@@ -120,7 +121,8 @@ function buildMenuTree(menus: SysMenu[]): MenuItem[] {
       title: menu.menuName || menu.title || '未命名菜单',
       path: menu.path || '',
       icon: menu.icon,
-      children: []
+      children: [],
+      menuType: menu.menuType
     }
     map.set(String(menu.id), normalizedMenu)
   })
@@ -139,8 +141,23 @@ function buildMenuTree(menus: SysMenu[]): MenuItem[] {
     }
   })
 
-  console.log('转换后的菜单树:', roots)
-  return roots
+  // 递归过滤空目录（目录类型menuType=0且没有子菜单）
+  function filterEmptyMenus(items: MenuItem[]): MenuItem[] {
+    return items.filter(item => {
+      // 如果有子菜单，递归过滤
+      if (item.children && item.children.length > 0) {
+        item.children = filterEmptyMenus(item.children)
+        // 过滤后如果有子菜单，保留；否则如果是目录类型则移除
+        return item.children.length > 0
+      }
+      // 没有子菜单的情况：如果是目录类型(menuType=0)则过滤掉，保留菜单类型(menuType=1)
+      return item.menuType !== 0
+    })
+  }
+
+  const filteredRoots = filterEmptyMenus(roots)
+  console.log('转换后的菜单树:', filteredRoots)
+  return filteredRoots
 }
 
 const router = useRouter();
@@ -160,76 +177,49 @@ async function loadMenus() {
     console.log('loadMenus - userInfo:', userInfo)
     console.log('loadMenus - roles:', roles)
 
-    // 角色编码到ID的映射
-    // 1001:超级管理员, 1002:人事专员, 1003:部门经理, 1004:普通员工, 1005:财务专员
-    const roleIdMap: Record<string, number> = {
-      'user': 1004,
-      'ROLE_USER': 1004,
-      'USER': 1004,
-      'EMPLOYEE': 1004,
-      'manager': 1003,
-      'ROLE_MANAGER': 1003,
-      'MANAGER': 1003,
-      'hr': 1002,
-      'HR': 1002,
-      'finance': 1005,
-      'FINANCE': 1005,
-    }
-
-    // 从角色编码获取对应的角色ID
-    let roleId = 1004 // 默认普通员工
-
-    // 优先使用 userInfo 中的 roleId
-    if (userInfo?.roleId) {
-      roleId = userInfo.roleId
-      console.log('使用 userInfo.roleId:', roleId)
-    } else {
-      // 从 roles 数组中查找匹配的角色ID
-      for (const role of roles) {
-        if (roleIdMap[role] !== undefined) {
-          roleId = roleIdMap[role]
-          console.log('从 roles 映射 roleId:', role, '->', roleId)
-          break
-        }
-      }
-    }
-
-    console.log('获取用户端菜单，角色:', roles, '角色ID:', roleId)
-
     // 获取所有菜单
     let menus: SysMenu[] = []
     try {
       menus = await getAllMenus()
       console.log('所有菜单原始数据:', menus)
     } catch (error) {
-      console.warn('获取所有菜单失败，尝试获取角色菜单:', error)
-      try {
-        menus = await getRoleMenus(roleId)
-        console.log('角色菜单原始数据:', menus)
-      } catch (roleError) {
-        console.error('获取角色菜单也失败:', roleError)
-        menus = []
-      }
+      console.warn('获取菜单失败，降级处理:', error)
+      menus = []
     }
 
-    // 过滤用户端菜单
-    // 用户端菜单: 2008员工自助 及其子菜单 2081-2088
-    // 工作流用户端: 2092-2093
-    const userMenuIds = new Set([
-      // 员工自助顶级菜单
-      2008,
-      // 员工自助子菜单
-      2081, 2082, 2083, 2084, 2085, 2086, 2087, 2088,
-      // 工作流用户端
-      2092, 2093,
-    ])
-
-    // 过滤菜单: 只保留用户端菜单
-    const userMenus = menus.filter(menu => {
-      const menuId = Number(menu.id)
-      return userMenuIds.has(menuId) || menu.menuType === 2
+    // 收集用户端菜单的父ID
+    const userMenuParentIds = new Set<string>()
+    
+    // 先过滤出用户端菜单
+    const userMenuItems = menus.filter(menu => {
+      const isSelfPath = menu.path?.startsWith('/self/')
+      const isUserSelfPath = menu.path?.startsWith('/user/self/')
+      const isUserMenu = isSelfPath || isUserSelfPath
+      const isButtonType = menu.menuType === 2
+      const hasPath = menu.path && menu.path.length > 0
+      console.log(`菜单ID: ${menu.id}, 名称: ${menu.menuName}, 路径: ${menu.path}, 类型: ${menu.menuType}, 是否用户端: ${isUserMenu}, 是否按钮: ${isButtonType}`)
+      
+      if (isUserMenu && !isButtonType && hasPath) {
+        // 记录父ID
+        if (menu.parentId && String(menu.parentId) !== '0') {
+          userMenuParentIds.add(String(menu.parentId))
+        }
+        return true
+      }
+      return false
     })
-    console.log('过滤后的用户端菜单:', userMenus)
+    console.log('用户端菜单项:', userMenuItems)
+    console.log('用户端菜单的父ID:', Array.from(userMenuParentIds))
+    
+    // 获取用户端菜单的父目录
+    const parentMenus = menus.filter(menu => 
+      userMenuParentIds.has(String(menu.id))
+    )
+    console.log('用户端菜单的父目录:', parentMenus)
+    
+    // 合并用户端菜单和它们的父目录
+    const userMenus = [...userMenuItems, ...parentMenus]
+    console.log('合并后的用户端菜单:', userMenus)
 
     // 将平铺数据转换为树形结构
     const menuTree = buildMenuTree(userMenus)
@@ -242,17 +232,43 @@ async function loadMenus() {
   }
 }
 
-onMounted(() => {
-  // 如果store中有菜单则使用，否则重新获取
-  if (userStore.menus.length > 0) {
-    const allMenus = userStore.menus as any
-    const userMenuIds = new Set([2008, 2081, 2082, 2083, 2084, 2085, 2086, 2087, 2088, 2092, 2093])
-    const userMenus = allMenus.filter((menu: any) => userMenuIds.has(menu.id) || menu.menuType === 2)
-    dynamicMenus.value = buildMenuTree(userMenus)
-  } else {
-    loadMenus()
-  }
-})
+  onMounted(() => {
+    // 如果store中有菜单则使用，否则重新获取
+    if (userStore.menus.length > 0) {
+      const allMenus = userStore.menus as any
+      
+      // 收集用户端菜单的父ID
+      const userMenuParentIds = new Set<string>()
+      
+      // 先过滤出用户端菜单
+      const userMenuItems = allMenus.filter((menu: any) => {
+        const isSelfPath = menu.path?.startsWith('/self/')
+        const isUserSelfPath = menu.path?.startsWith('/user/self/')
+        const isUserMenu = isSelfPath || isUserSelfPath
+        const isButtonType = menu.menuType === 2
+        
+        if (isUserMenu && !isButtonType) {
+          // 记录父ID
+          if (menu.parentId && String(menu.parentId) !== '0') {
+            userMenuParentIds.add(String(menu.parentId))
+          }
+          return true
+        }
+        return false
+      })
+      
+      // 获取用户端菜单的父目录
+      const parentMenus = allMenus.filter((menu: any) => 
+        userMenuParentIds.has(String(menu.id))
+      )
+      
+      // 合并用户端菜单和它们的父目录
+      const userMenus = [...userMenuItems, ...parentMenus]
+      dynamicMenus.value = buildMenuTree(userMenus)
+    } else {
+      loadMenus()
+    }
+  })
 
 watch(
   () => route.path,

@@ -11,8 +11,24 @@ export interface Department {
   children?: Department[]
 }
 
+export interface PageResult<T> {
+  total: number
+  records: T[]
+}
+
+export interface DeptPageParams {
+  pageNum?: number
+  pageSize?: number
+  deptName?: string
+  status?: number
+}
+
 export const getDeptTree = (): Promise<Department[]> => {
   return request.get('/org/dept/tree')
+}
+
+export const getDeptPage = (params: DeptPageParams): Promise<PageResult<Department>> => {
+  return request.get('/org/dept/page', params)
 }
 
 export const createDept = (data: Partial<Department>) => {

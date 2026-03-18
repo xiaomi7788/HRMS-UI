@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
 interface MenuItem {
@@ -32,6 +32,7 @@ interface MenuItem {
 
 defineProps<{
   menus: MenuItem[]
+  mode?: string
 }>()
 
 // 获取图标组件

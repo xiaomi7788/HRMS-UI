@@ -42,6 +42,8 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     const res = response.data
+    console.log('响应拦截器', res);
+
 
     // 业务逻辑成功
     if (res.code === 200 || res.code === 0) {
@@ -92,6 +94,8 @@ service.interceptors.response.use(
 // ---- 封装通用请求方法 ----
 const request = {
   get<T = unknown>(url: string, params?: object, config?: AxiosRequestConfig): Promise<T> {
+    console.log('params-->', params);
+
     return service.get(url, { params, ...config }) as Promise<T>
   },
   post<T = unknown>(url: string, data?: object, config?: AxiosRequestConfig): Promise<T> {

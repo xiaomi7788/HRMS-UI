@@ -15,10 +15,10 @@
           active-text-color="#409EFF"
         >
           <!-- 仪表盘固定显示 -->
-          <el-menu-item index="/admin">
+          <!-- <el-menu-item index="/admin">
             <el-icon><House /></el-icon>
             <span>仪表盘</span>
-          </el-menu-item>
+          </el-menu-item> -->
 
           <!-- 动态菜单 -->
           <DynamicMenu :menus="dynamicMenus" v-if="dynamicMenus.length > 0" />
@@ -79,9 +79,10 @@ interface MenuItem {
   path: string
   icon?: string
   children?: MenuItem[]
+  menuType?: number
 }
 
-// 将平铺菜单数据转换为树形结构
+// 将平铺菜单数据转换为树形结构，并过滤掉没有子菜单的目录
 function buildMenuTree(menus: SysMenu[]): MenuItem[] {
   console.log('原始菜单数据:', menus)
   // 后端返回的 id 和 parentId 可能是字符串，使用 string 作为 key
@@ -97,7 +98,8 @@ function buildMenuTree(menus: SysMenu[]): MenuItem[] {
       title: menu.menuName || menu.title || '未命名菜单',
       path: menu.path || '',
       icon: menu.icon,
-      children: []
+      children: [],
+      menuType: menu.menuType // 保存menuType用于后续过滤
     }
     // 使用字符串作为 key，兼容后端返回的字符串 id
     map.set(String(menu.id), normalizedMenu)
@@ -118,8 +120,23 @@ function buildMenuTree(menus: SysMenu[]): MenuItem[] {
     }
   })
 
-  console.log('转换后的菜单树:', roots)
-  return roots
+  // 递归过滤空目录（目录类型menuType=0且没有子菜单）
+  function filterEmptyMenus(items: MenuItem[]): MenuItem[] {
+    return items.filter(item => {
+      // 如果有子菜单，递归过滤
+      if (item.children && item.children.length > 0) {
+        item.children = filterEmptyMenus(item.children)
+        // 过滤后如果有子菜单，保留；否则如果是目录类型则移除
+        return item.children.length > 0
+      }
+      // 没有子菜单的情况：如果是目录类型(menuType=0)则过滤掉，保留菜单类型(menuType=1)
+      return item.menuType !== 0
+    })
+  }
+
+  const filteredRoots = filterEmptyMenus(roots)
+  console.log('转换后的菜单树:', filteredRoots)
+  return filteredRoots
 }
 
 const router = useRouter();
@@ -150,7 +167,7 @@ async function loadMenus() {
     console.log('loadMenus - userInfo:', userInfo)
     console.log('loadMenus - roles:', roles)
 
-    // 获取菜单
+    // 获取所有菜单
     let menus: SysMenu[] = []
     try {
       menus = await getAllMenus()
@@ -161,51 +178,25 @@ async function loadMenus() {
       menus = []
     }
 
-    // 过滤管理端菜单 (只保留管理端相关的菜单)
-    // 超级管理员: 显示所有管理端菜单(不包括用户端专用菜单)
-    // 普通管理员: 显示其角色分配的菜单
-    const adminMenuIds = new Set([
-      // 顶级目录
-      2001, 2002, 2003, 2004, 2005, 2006, 2007, 2009, 2010,
-      // 系统管理子菜单
-      2011, 2012, 2013, 2014, 2015,
-      // 组织人事子菜单
-      2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028,
-      // 招聘管理子菜单
-      2031, 2032, 2033, 2034, 2035,
-      // 考勤管理子菜单
-      2041, 2042, 2043, 2044, 2045, 2046, 2047,
-      // 绩效管理子菜单
-      2051, 2052, 2053, 2054, 2055, 2056,
-      // 薪酬管理子菜单
-      2061, 2062, 2063, 2064, 2065, 2066, 2067, 2068,
-      // 培训管理子菜单
-      2071, 2072, 2073, 2074, 2075, 2076, 2077,
-      // 工作流子菜单
-      2091, 2092, 2093, 2094,
-      // 数据报表子菜单
-      2101, 2102, 2103, 2104, 2105, 2106,
-    ])
-
-    // 过滤菜单:
-    // 1. 只保留管理端菜单 (排除员工自助菜单2008及其子菜单)
-    // 2. 排除按钮权限菜单 (menuType=2)
-    console.log('开始过滤菜单, 总数:', menus.length)
-    console.log('菜单ID列表:', menus.map(m => ({ id: m.id, name: m.menuName, type: m.menuType, parent: m.parentId })))
+    // 过滤管理端菜单: 排除用户端菜单和按钮类型
     const adminMenus = menus.filter(menu => {
-      // 转换为数字类型进行比较
-      const menuId = Number(menu.id)
-      const isAdminMenu = adminMenuIds.has(menuId)
+      // 排除用户端菜单
+      const isSelfPath = menu.path?.startsWith('/self/')
+      const isUserSelfPath = menu.path?.startsWith('/user/self/')
+      const isUserMenu = isSelfPath || isUserSelfPath
+      // 排除按钮类型
       const isButtonType = menu.menuType === 2
-      console.log(`菜单ID: ${menu.id} (${menuId}), 名称: ${menu.menuName}, 类型: ${menu.menuType}, 是否管理端: ${isAdminMenu}, 是否按钮: ${isButtonType}`)
-      return isAdminMenu && !isButtonType
+      // 过滤条件：不是用户端菜单 且 不是按钮类型
+      const keep = !isUserMenu && !isButtonType
+      console.log(`菜单ID: ${menu.id}, 名称: ${menu.menuName}, 路径: ${menu.path}, 类型: ${menu.menuType}, 是用户端: ${isUserMenu}, 是按钮: ${isButtonType}, 是否保留: ${keep}`)
+      return keep
     })
     console.log('过滤后的管理端菜单:', adminMenus)
 
     // 将平铺数据转换为树形结构
     const menuTree = buildMenuTree(adminMenus)
     dynamicMenus.value = menuTree
-    
+
     // 转换为 SysMenu 类型存入 store（兼容老代码）
     userStore.setMenus(menus as any)
   } catch (error) {
@@ -213,16 +204,19 @@ async function loadMenus() {
   }
 }
 
-onMounted(() => {
-  // 如果store中有菜单则使用，否则重新获取
-  if (userStore.menus.length > 0) {
-    // 转换为 MenuItem 类型并过滤按钮类型
-    const filteredMenus = userStore.menus.filter((menu: any) => menu.menuType !== 2)
-    dynamicMenus.value = buildMenuTree(filteredMenus)
-  } else {
-    loadMenus()
-  }
-})
+  onMounted(() => {
+    // 如果store中有菜单则使用，否则重新获取
+    if (userStore.menus.length > 0) {
+      const allMenus = userStore.menus as any
+      // 过滤管理端菜单: 排除用户端菜单和按钮类型
+      const adminMenus = allMenus.filter((menu: any) =>
+        !(menu.path?.startsWith('/self/') || menu.path?.startsWith('/user/self/')) && menu.menuType !== 2
+      )
+      dynamicMenus.value = buildMenuTree(adminMenus)
+    } else {
+      loadMenus()
+    }
+  })
 
 const logout = () => {
   userStore.logout();

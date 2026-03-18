@@ -500,7 +500,7 @@ import { ElMessage, type FormInstance, type FormRules, type UploadProps } from '
 import { Search } from '@element-plus/icons-vue'
 import {
   getEmployeePage,
-  getEmployee,
+  getEmployeeById,
   createEmployee,
   updateEmployee,
   deleteEmployee,
@@ -743,7 +743,7 @@ const handleEdit = async (row: Employee) => {
   isEditMode.value = true
   dialogTitle.value = '编辑员工'
   try {
-    const detail = await getEmployee(row.id!)
+    const detail = await getEmployeeById(row.id!)
     Object.assign(formData, detail)
     dialogVisible.value = true
   } catch (error) {
@@ -753,7 +753,7 @@ const handleEdit = async (row: Employee) => {
 
 const handleDetail = async (row: Employee) => {
   try {
-    currentEmployee.value = await getEmployee(row.id!)
+    currentEmployee.value = await getEmployeeById(row.id!)
     detailDialogVisible.value = true
   } catch (error) {
     console.error('加载员工详情失败:', error)
