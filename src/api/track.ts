@@ -3,6 +3,7 @@ import request from '@/utils/request'
 export interface PerfTrack {
   id?: number
   perfResultId?: number
+  perfResult?: PerfResultInfo
   employeeId?: number
   trackType?: string
   content?: string
@@ -13,6 +14,14 @@ export interface PerfTrack {
   createTime?: string
   updateTime?: string
   deleted?: number
+}
+
+export interface PerfResultInfo {
+  id?: number
+  employeeName?: string
+  employeeNo?: string
+  totalScore?: number
+  grade?: string
 }
 
 export interface TrackPageParams {

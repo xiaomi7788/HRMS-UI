@@ -28,23 +28,19 @@ export interface Employee {
 export interface EmployeePageParams {
   pageNum?: number
   pageSize?: number
-  employeeNo?: string
-  employeeName?: string
   deptId?: number
-  positionId?: number
-  status?: number
+  workStatus?: number
+  keyword?: string
 }
 
 export interface TransferDTO {
-  id: number
-  targetDeptId: number
-  targetPositionId: number
+  deptId: number
+  positionId?: number
   effectiveDate: string
-  reason?: string
+  remark?: string
 }
 
 export interface LeaveDTO {
-  id: number
   leaveDate: string
   reason?: string
 }
@@ -78,14 +74,14 @@ export const exportEmployee = (params?: EmployeePageParams) => {
   return request.get('/org/employee/export', params, { responseType: 'blob' })
 }
 
-export const transferEmployee = (data: TransferDTO) => {
-  return request.put(`/org/employee/${data.id}/transfer`, data)
+export const transferEmployee = (id: number, data: TransferDTO) => {
+  return request.put(`/org/employee/${id}/transfer`, data)
 }
 
-export const regularEmployee = (id: number, data: { regularDate: string; comment?: string }) => {
-  return request.put(`/org/employee/${id}/regular`, { regularDate: data.regularDate })
+export const regularEmployee = (id: number, data: { regularDate: string }) => {
+  return request.put(`/org/employee/${id}/regular`, data)
 }
 
-export const leaveEmployee = (data: LeaveDTO) => {
-  return request.put(`/org/employee/${data.id}/leave`, data)
+export const leaveEmployee = (id: number, data: LeaveDTO) => {
+  return request.put(`/org/employee/${id}/leave`, data)
 }

@@ -14,6 +14,7 @@
             v-model="queryParams.keyword"
             placeholder="请输入员工姓名"
             clearable
+            style="width: 150px"
             @clear="handleQuery"
           />
         </el-form-item>
@@ -608,7 +609,7 @@ const handleQuery = async () => {
 
     const res = await getAccountPage(params)
     accountList.value = res.records
-    total.value = res.total
+    total.value = Number(res.total)
   } catch (error) {
     ElMessage.error('获取账户列表失败')
   } finally {
@@ -644,17 +645,21 @@ const handleEdit = (row: SocialAccount) => {
 // 停保
 const handleStop = async (row: SocialAccount) => {
   try {
-    await ElMessageBox.confirm('确认要停保该账户吗？', '提示', {
+    const { value: endMonth } = await ElMessageBox.prompt('请输入停保月份', '停保确认', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      type: 'warning'
+      inputPattern: /^\d{4}-\d{2}$/,
+      inputErrorMessage: '请输入正确的月份格式，如：2026-03'
     })
-    await stopAccount(row.id!)
-    ElMessage.success('停保成功')
-    handleQuery()
-  } catch (error) {
+    if (endMonth) {
+      await stopAccount(row.id!, endMonth)
+      ElMessage.success('停保成功')
+      handleQuery()
+    }
+  } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('停保失败')
+      console.error('停保失败:', error)
+      ElMessage.error(error.message || '停保失败')
     }
   }
 }

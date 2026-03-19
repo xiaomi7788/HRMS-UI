@@ -34,6 +34,7 @@ export interface ObjectivePageParams {
   employeeId?: number
   period?: string
   objectiveType?: string
+  parentOnly?: boolean
 }
 
 export interface ProgressUpdateParams {
@@ -55,7 +56,7 @@ export const getObjectivePage = (params: ObjectivePageParams) => {
   return request.get<PageResult<PerfObjective>>('/performance/objective/page', params)
 }
 
-export const getObjectiveTree = (params?: { planId?: number; employeeId?: number; period?: string }) => {
+export const getObjectiveTree = (params?: { planId?: number; employeeId?: number; period?: string; objectiveType?: string }) => {
   return request.get<PerfObjective[]>('/performance/objective/tree', params)
 }
 

@@ -11,41 +11,28 @@
           class="el-menu-demo"
           mode="horizontal"
           router
+          :ellipsis="false"
           background-color="#2b2b2b"
           text-color="#bfcbd9"
           active-text-color="#409EFF"
         >
-          <!-- <el-menu-item index="/user">
-            <el-icon><House /></el-icon>
-            <span>个人中心</span>
-          </el-menu-item> -->
-
-          <!-- 动态菜单 -->
-          <DynamicMenu :menus="dynamicMenus" v-if="dynamicMenus.length > 0" />
-
-          <!-- 部门经理附加功能 -->
-          <el-sub-menu v-if="userStore.hasRole('manager')" index="manager-functions">
-            <template #title>
-              <el-icon><Management /></el-icon>
-              <span>团队管理</span>
-            </template>
-            <el-menu-item index="/user/manager/team-employee-list">
-              <el-icon><UserFilled /></el-icon>
-              <span>团队员工列表</span>
-            </el-menu-item>
-            <el-menu-item index="/user/manager/team-attendance-view">
-              <el-icon><Calendar /></el-icon>
-              <span>团队考勤查看</span>
-            </el-menu-item>
-            <el-menu-item index="/user/manager/team-performance-view">
-              <el-icon><TrendCharts /></el-icon>
-              <span>团队绩效查看</span>
-            </el-menu-item>
-            <el-menu-item index="/user/manager/approval-center">
-              <el-icon><Connection /></el-icon>
-              <span>审批中心</span>
+          <!-- 显示所有菜单 -->
+          <el-menu-item
+            v-for="menu in firstItem"
+            :key="menu.id"
+            :index="menu.path"
+          >
+            <el-icon><component :is="getIcon(menu.icon)" /></el-icon>
+            <span>{{ menu.menuName }}</span>
+          </el-menu-item>
+          <el-sub-menu index="#" v-if="secondItem.length > 0">
+            <template #title>更多</template>
+            <el-menu-item v-for="menu1 in secondItem" :index="menu1.path" :key="menu1.id">
+              <el-icon><component :is="getIcon(menu1.icon)" /></el-icon>
+              <span>{{ menu1.menuName }}</span>
             </el-menu-item>
           </el-sub-menu>
+
         </el-menu>
       </div>
       <div class="header-right">
@@ -86,14 +73,11 @@ import { useRouter, useRoute } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useUiStore } from '@/stores/ui';
 import { ElMessage } from 'element-plus';
-import DynamicMenu from '@/components/DynamicMenu.vue';
 import { getAllMenus, type SysMenu } from '@/api/auth';
 import {
-  House,
   Management,
   UserFilled,
   TrendCharts,
-  Connection,
 } from '@element-plus/icons-vue';
 
 // 匹配 DynamicMenu 组件的菜单类型
@@ -105,59 +89,7 @@ interface MenuItem {
   icon?: string
   children?: MenuItem[]
   menuType?: number
-}
-
-// 将平铺菜单数据转换为树形结构，并过滤掉没有子菜单的目录
-function buildMenuTree(menus: SysMenu[]): MenuItem[] {
-  console.log('原始菜单数据:', menus)
-  const map = new Map<string, MenuItem>()
-  const roots: MenuItem[] = []
-
-  // 处理可能的字段名差异
-  menus.forEach(menu => {
-    const normalizedMenu: MenuItem = {
-      id: Number(menu.id),
-      parentId: menu.parentId ? Number(menu.parentId) : 0,
-      title: menu.menuName || menu.title || '未命名菜单',
-      path: menu.path || '',
-      icon: menu.icon,
-      children: [],
-      menuType: menu.menuType
-    }
-    map.set(String(menu.id), normalizedMenu)
-  })
-
-  menus.forEach(menu => {
-    const node = map.get(String(menu.id))!
-    const pid = menu.parentId ? String(menu.parentId) : '0'
-    if (pid === '0' || pid === 'null' || pid === null || pid === undefined) {
-      roots.push(node)
-    } else {
-      const parent = map.get(pid)
-      if (parent) {
-        parent.children = parent.children || []
-        parent.children.push(node)
-      }
-    }
-  })
-
-  // 递归过滤空目录（目录类型menuType=0且没有子菜单）
-  function filterEmptyMenus(items: MenuItem[]): MenuItem[] {
-    return items.filter(item => {
-      // 如果有子菜单，递归过滤
-      if (item.children && item.children.length > 0) {
-        item.children = filterEmptyMenus(item.children)
-        // 过滤后如果有子菜单，保留；否则如果是目录类型则移除
-        return item.children.length > 0
-      }
-      // 没有子菜单的情况：如果是目录类型(menuType=0)则过滤掉，保留菜单类型(menuType=1)
-      return item.menuType !== 0
-    })
-  }
-
-  const filteredRoots = filterEmptyMenus(roots)
-  console.log('转换后的菜单树:', filteredRoots)
-  return filteredRoots
+  sort?: number
 }
 
 const router = useRouter();
@@ -166,7 +98,98 @@ const userStore = useUserStore();
 const uiStore = useUiStore();
 
 const activeMenu = ref(route.path);
-const dynamicMenus = ref<MenuItem[]>([]);
+const userMenuItems = ref<SysMenu[]>([]);
+const firstItem = ref<SysMenu[]>([]);
+const secondItem = ref<SysMenu[]>([]);
+
+// 计算平铺显示的菜单（前5个）
+const visibleMenus = computed(() => {
+  // 直接使用用户端菜单项
+  const sorted = userMenuItems.value.sort((a, b) => {
+    const aSort = a.sort || 0
+    const bSort = b.sort || 0
+    return aSort - bSort
+  })
+  
+  // 返回前4个
+  return sorted.slice(0, 4)
+})
+
+// 获取图标组件
+function getIcon(iconName?: string) {
+  if (!iconName) return 'Folder'
+  const iconMap: Record<string, any> = {
+    'House': House,
+    'User': UserFilled,
+    'Setting': 'Setting',
+    'Document': 'Document',
+    'Folder': 'Folder',
+    'FolderOpened': 'FolderOpened',
+    'Files': 'Files',
+    'List': 'List',
+    'Grid': 'Grid',
+    'Menu': 'Menu',
+    'Search': 'Search',
+    'Bell': 'Bell',
+    'Message': 'Message',
+    'Star': 'Star',
+    'StarFilled': 'StarFilled',
+    'Clock': 'Clock',
+    'Calendar': 'Calendar',
+    'Money': 'Money',
+    'Wallet': 'Wallet',
+    'TrendCharts': TrendCharts,
+    'DataLine': 'DataLine',
+    'PieChart': 'PieChart',
+    'Histogram': 'Histogram',
+    'Management': Management,
+    'Tools': 'Tools',
+    'Brush': 'Brush',
+    'Lock': 'Lock',
+    'Key': 'Key',
+    'Medal': 'Medal',
+    'Trophy': 'Trophy',
+    'Briefcase': 'Briefcase',
+    'School': 'School',
+    'Reading': 'Reading',
+    'Film': 'Film',
+    'Camera': 'Camera',
+    'Picture': 'Picture',
+    'Upload': 'Upload',
+    'Download': 'Download',
+    'Link': 'Link',
+    'Phone': 'Phone',
+    'MessageBox': 'MessageBox',
+    'Postcard': 'Postcard',
+    'OfficeBuilding': 'OfficeBuilding',
+    'HomeFilled': 'HomeFilled',
+    'UserFilled': 'UserFilled',
+    'Cherry': 'Cherry',
+    'Food': 'Food',
+    'Present': 'Present',
+    'Sunrise': 'Sunrise',
+    'Sunset': 'Sunset',
+    'Cloudy': 'Cloudy',
+    'Sunny': 'Sunny',
+    'Moon': 'Moon',
+    'Ticket': 'Ticket',
+    'Flag': 'Flag',
+    'Location': 'Location',
+    'Aim': 'Aim',
+    'Promotion': 'Promotion',
+    'Pointer': 'Pointer',
+    'MagicStick': 'MagicStick',
+    'Headset': 'Headset',
+    'Microphone': 'Microphone',
+    'Coffee': 'Coffee',
+    'GobletFull': 'GobletFull',
+    'Watermelon': 'Watermelon',
+    'Grape': 'Grape',
+    'Apple': 'Apple',
+    'Orange': 'Orange',
+  }
+  return iconMap[iconName] || 'Folder'
+}
 
 // 加载菜单
 async function loadMenus() {
@@ -187,84 +210,46 @@ async function loadMenus() {
       menus = []
     }
 
-    // 收集用户端菜单的父ID
-    const userMenuParentIds = new Set<string>()
-    
-    // 先过滤出用户端菜单
-    const userMenuItems = menus.filter(menu => {
-      const isSelfPath = menu.path?.startsWith('/self/')
-      const isUserSelfPath = menu.path?.startsWith('/user/self/')
-      const isUserMenu = isSelfPath || isUserSelfPath
+    // 过滤用户端菜单：path以/user/开头，不是按钮，有路径
+    const filteredUserMenuItems = menus.filter(menu => {
+      const isUserPath = menu.path?.startsWith('/user/')
       const isButtonType = menu.menuType === 2
       const hasPath = menu.path && menu.path.length > 0
-      console.log(`菜单ID: ${menu.id}, 名称: ${menu.menuName}, 路径: ${menu.path}, 类型: ${menu.menuType}, 是否用户端: ${isUserMenu}, 是否按钮: ${isButtonType}`)
-      
-      if (isUserMenu && !isButtonType && hasPath) {
-        // 记录父ID
-        if (menu.parentId && String(menu.parentId) !== '0') {
-          userMenuParentIds.add(String(menu.parentId))
-        }
-        return true
-      }
-      return false
+      console.log(`菜单ID: ${menu.id}, 名称: ${menu.menuName}, 路径: ${menu.path}, 类型: ${menu.menuType}, 是否用户端: ${isUserPath}`)
+
+      // 只显示用户端菜单：/user/开头，不是按钮，有路径
+      return isUserPath && !isButtonType && hasPath
     })
-    console.log('用户端菜单项:', userMenuItems)
-    console.log('用户端菜单的父ID:', Array.from(userMenuParentIds))
-    
-    // 获取用户端菜单的父目录
-    const parentMenus = menus.filter(menu => 
-      userMenuParentIds.has(String(menu.id))
-    )
-    console.log('用户端菜单的父目录:', parentMenus)
-    
-    // 合并用户端菜单和它们的父目录
-    const userMenus = [...userMenuItems, ...parentMenus]
-    console.log('合并后的用户端菜单:', userMenus)
+    console.log('过滤后的用户端菜单项:', filteredUserMenuItems)
 
-    // 将平铺数据转换为树形结构
-    const menuTree = buildMenuTree(userMenus)
-    dynamicMenus.value = menuTree
-
-    // 转换为 SysMenu 类型存入 store（兼容老代码）
-    userStore.setMenus(menus as any)
+    // 保存用户端菜单项到响应式变量
+    userMenuItems.value = filteredUserMenuItems as any
+    firstItem.value = userMenuItems.value.slice(0, 4);
+    secondItem.value = userMenuItems.value.slice(4);
   } catch (error) {
     console.error('获取菜单失败:', error)
   }
 }
 
-  onMounted(() => {
+onMounted(() => {
+    console.log('onMounted->',userStore);
+
     // 如果store中有菜单则使用，否则重新获取
     if (userStore.menus.length > 0) {
       const allMenus = userStore.menus as any
-      
-      // 收集用户端菜单的父ID
-      const userMenuParentIds = new Set<string>()
-      
-      // 先过滤出用户端菜单
-      const userMenuItems = allMenus.filter((menu: any) => {
-        const isSelfPath = menu.path?.startsWith('/self/')
-        const isUserSelfPath = menu.path?.startsWith('/user/self/')
-        const isUserMenu = isSelfPath || isUserSelfPath
+
+      // 过滤用户端菜单：path以/user/开头，不是按钮，有路径
+      const filteredUserMenuItems = allMenus.filter((menu: any) => {
+        const isUserPath = menu.path?.startsWith('/user/')
         const isButtonType = menu.menuType === 2
-        
-        if (isUserMenu && !isButtonType) {
-          // 记录父ID
-          if (menu.parentId && String(menu.parentId) !== '0') {
-            userMenuParentIds.add(String(menu.parentId))
-          }
-          return true
-        }
-        return false
+        const hasPath = menu.path && menu.path.length > 0
+
+        // 只显示用户端菜单：/user/开头，不是按钮，有路径
+        return isUserPath && !isButtonType && hasPath
       })
-      
-      // 获取用户端菜单的父目录
-      const parentMenus = allMenus.filter((menu: any) => 
-        userMenuParentIds.has(String(menu.id))
-      )
-      
-      // 合并用户端菜单和它们的父目录
-      const userMenus = [...userMenuItems, ...parentMenus]
-      dynamicMenus.value = buildMenuTree(userMenus)
+
+      // 保存用户端菜单项到响应式变量
+      userMenuItems.value = filteredUserMenuItems
     } else {
       loadMenus()
     }

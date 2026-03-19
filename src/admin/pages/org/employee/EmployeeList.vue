@@ -12,20 +12,17 @@
       </template>
 
       <div class="search-section">
-        <el-select
+        <el-tree-select
           v-model="searchForm.deptId"
+          :data="deptList"
+          :props="{ label: 'deptName', value: 'id' }"
+          :render-after-expand="false"
           placeholder="请选择部门"
           clearable
+          check-strictly
           style="width: 200px; margin-right: 10px;"
           @change="handleSearch"
-        >
-          <el-option
-            v-for="dept in deptList"
-            :key="dept.id"
-            :label="dept.deptName"
-            :value="dept.id"
-          />
-        </el-select>
+        />
         <el-select
           v-model="searchForm.workStatus"
           placeholder="请选择在职状态"
@@ -571,14 +568,14 @@ const formData = reactive<Partial<Employee>>({
   remark: ''
 })
 
-const transferForm = reactive<TransferDTO>({
-  deptId: 0,
-  positionId: undefined,
+const transferForm = reactive({
+  deptId: undefined as number | undefined,
+  positionId: undefined as number | undefined,
   effectiveDate: '',
   remark: ''
 })
 
-const leaveForm = reactive<LeaveDTO>({
+const leaveForm = reactive({
   leaveDate: '',
   reason: ''
 })
@@ -605,6 +602,9 @@ const rules: FormRules = {
 const transferRules: FormRules = {
   deptId: [
     { required: true, message: '请选择调入部门', trigger: 'change' }
+  ],
+  positionId: [
+    { required: true, message: '请选择调入岗位', trigger: 'change' }
   ],
   effectiveDate: [
     { required: true, message: '请选择生效日期', trigger: 'change' }
@@ -807,7 +807,12 @@ const handleSaveTransfer = async () => {
   transferFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
-        await transferEmployee(currentEmployeeId.value, transferForm)
+        await transferEmployee(currentEmployeeId.value, {
+          deptId: transferForm.deptId,
+          positionId: transferForm.positionId,
+          effectiveDate: transferForm.effectiveDate,
+          remark: transferForm.remark
+        })
         ElMessage.success('调岗成功')
         transferDialogVisible.value = false
         loadEmployeePage()
@@ -832,7 +837,10 @@ const handleSaveLeave = async () => {
   leaveFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
-        await leaveEmployee(currentEmployeeId.value, leaveForm)
+        await leaveEmployee(currentEmployeeId.value, {
+          leaveDate: leaveForm.leaveDate,
+          reason: leaveForm.reason
+        })
         ElMessage.success('离职办理成功')
         leaveDialogVisible.value = false
         loadEmployeePage()
@@ -856,7 +864,7 @@ const handleSaveRegular = async () => {
   regularFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
-        await regularEmployee(currentEmployeeId.value, regularForm.regularDate || undefined)
+        await regularEmployee(currentEmployeeId.value, { regularDate: regularForm.regularDate })
         ElMessage.success('转正成功')
         regularDialogVisible.value = false
         loadEmployeePage()

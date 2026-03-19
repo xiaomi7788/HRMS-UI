@@ -22,8 +22,8 @@ export interface SalaryConfig {
 export interface SalaryRecord {
   id?: number
   employeeId?: number
-  employeeName?: string
   employeeNo?: string
+  employeeName?: string
   payMonth?: string
   baseSalary?: number
   allowance?: number
@@ -45,6 +45,7 @@ export interface ConfigPageParams {
   pageNum?: number
   pageSize?: number
   keyword?: string
+  status?: number
 }
 
 export interface RecordPageParams {
@@ -78,7 +79,11 @@ export interface PageResult<T> {
 
 // 薪资档案
 export const getConfigPage = (params: ConfigPageParams) => {
-  return request.get<PageResult<SalaryConfig>>('/salary/config/page', params)
+  // 过滤掉 undefined、空字符串和null的参数
+  const filteredParams = Object.fromEntries(
+    Object.entries(params).filter(([_, v]) => v !== undefined && v !== '' && v !== null)
+  )
+  return request.get<PageResult<SalaryConfig>>('/salary/config/page', filteredParams)
 }
 
 export const getConfigByEmployeeId = (employeeId: number) => {
@@ -115,5 +120,9 @@ export const getCostSummary = (payMonth?: string) => {
 }
 
 export const getCostTrend = (startMonth?: string, endMonth?: string) => {
-  return request.get('/salary/record/cost-trend', { startMonth, endMonth })
+  // 过滤掉 undefined、空字符串和null的参数
+  const params = Object.fromEntries(
+    Object.entries({ startMonth, endMonth }).filter(([_, v]) => v !== undefined && v !== '' && v !== null)
+  )
+  return request.get('/salary/record/cost-trend', Object.keys(params).length > 0 ? params : undefined)
 }

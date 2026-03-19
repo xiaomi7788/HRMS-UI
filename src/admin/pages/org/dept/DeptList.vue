@@ -117,6 +117,7 @@ import {
   type Department
 } from '@/api/dept'
 import { getUserPage, type SysUser } from '@/api/user'
+import { lo } from 'element-plus/es/locale/index.mjs'
 
 const deptList = ref<Department[]>([])
 const userList = ref<SysUser[]>([])
@@ -149,6 +150,8 @@ const rules: FormRules = {
 const loadDeptTree = async () => {
   try {
     deptList.value = await getDeptTree()
+    console.log('loadDeptTree',await getDeptTree());
+    
   } catch (error) {
     console.error('加载部门树失败:', error)
   }

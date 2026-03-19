@@ -42,13 +42,24 @@
             <el-option label="预警" value="WARNING" />
           </el-select>
         </el-form-item>
-        <el-form-item label="绩效结果ID">
-          <el-input-number
+        <el-form-item label="绩效结果">
+          <el-select
             v-model="queryParams.perfResultId"
-            placeholder="绩效结果ID"
-            :min="1"
-            style="width: 150px"
-          />
+            placeholder="选择绩效结果"
+            clearable
+            filterable
+            remote
+            :remote-method="searchPerfResult"
+            :loading="perfResultLoading"
+            style="width: 200px"
+          >
+            <el-option
+              v-for="result in perfResultList"
+              :key="result.id"
+              :label="`${result.totalScore}分`"
+              :value="result.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleQuery">查询</el-button>
@@ -73,12 +84,12 @@
           </template>
         </el-table-column>
         <el-table-column prop="content" label="跟踪内容" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="progressPercent" label="进度" width="120">
+        <el-table-column label="进度" width="150">
           <template #default="{ row }">
-            <div v-if="row.trackType === 'PROGRESS' && row.progressPercent !== undefined" class="progress-cell">
+            <div v-if="row.progressPercent !== undefined && row.progressPercent !== null" class="progress-cell">
               <el-progress
                 :percentage="row.progressPercent"
-                :status="getProgressStatus(row.progressPercent)"
+                :color="getProgressColor(row.progressPercent)"
                 :stroke-width="10"
                 :show-text="false"
                 style="width: 80px; margin-right: 8px"
@@ -94,9 +105,12 @@
             <span v-else class="text-gray">-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="perfResultId" label="绩效结果ID" width="120">
+        <el-table-column label="绩效结果" width="120">
           <template #default="{ row }">
-            <span v-if="row.perfResultId">{{ row.perfResultId }}</span>
+            <span v-if="row.perfResult">
+              {{ row.perfResult.totalScore }}分
+            </span>
+            <span v-else-if="row.perfResultId" class="text-gray">ID: {{ row.perfResultId }}</span>
             <span v-else class="text-gray">-</span>
           </template>
         </el-table-column>
@@ -174,14 +188,25 @@
           </el-select>
         </el-form-item>
         
-        <el-form-item label="绩效结果ID" prop="perfResultId">
-          <el-input-number
+        <el-form-item label="绩效结果" prop="perfResultId">
+          <el-select
             v-model="formData.perfResultId"
-            placeholder="请输入绩效结果ID"
-            :min="1"
+            placeholder="请选择绩效结果"
+            filterable
+            remote
+            :remote-method="searchPerfResult"
+            :loading="perfResultLoading"
             style="width: 100%"
-          />
-          <div class="form-tips">必填，关联到具体的绩效结果</div>
+            @change="handlePerfResultChange"
+          >
+            <el-option
+              v-for="result in perfResultList"
+              :key="result.id"
+              :label="`${result.totalScore}分`"
+              :value="result.id"
+            />
+          </el-select>
+          <div class="form-tips">必填，关联到具体的绩效结果，选择后自动填充员工</div>
         </el-form-item>
         
         <el-form-item v-if="formData.trackType === 'PROGRESS'" label="进度百分比" prop="progressPercent">
@@ -232,6 +257,7 @@ import {
   type TrackPageParams
 } from '@/api/track'
 import { getEmployeePage, type Employee } from '@/api/employee'
+import { getResultPage, type PerfResult } from '@/api/performance'
 
 const loading = ref(false)
 const tableData = ref<PerfTrack[]>([])
@@ -249,6 +275,18 @@ interface EmployeeOption {
 }
 const employeeList = ref<EmployeeOption[]>([])
 const employeeLoading = ref(false)
+
+// 绩效结果相关
+interface PerfResultOption {
+  id?: number
+  employeeName?: string
+  employeeNo?: string
+  totalScore?: number
+  grade?: string
+  period?: string
+}
+const perfResultList = ref<PerfResultOption[]>([])
+const perfResultLoading = ref(false)
 
 // 查询参数
 const queryParams = reactive<TrackPageParams>({
@@ -315,6 +353,59 @@ const searchEmployee = async (query?: string) => {
   }
 }
 
+// 加载绩效结果列表
+const loadPerfResultList = async () => {
+  perfResultLoading.value = true
+  try {
+    const data = await getResultPage({
+      pageNum: 1,
+      pageSize: 100
+    })
+    perfResultList.value = data.records.map((result: PerfResult) => ({
+      id: result.id,
+      employeeName: result.employeeName || '未知员工',
+      employeeNo: result.employeeNo || result.employeeId?.toString() || '-',
+      totalScore: result.totalScore ?? 0,
+      grade: result.grade,
+      period: result.period
+    }))
+  } catch (error) {
+    console.error('加载绩效结果列表失败:', error)
+    perfResultList.value = []
+  } finally {
+    perfResultLoading.value = false
+  }
+}
+
+// 搜索绩效结果
+const searchPerfResult = async (query?: string) => {
+  if (!query || query.trim() === '') {
+    loadPerfResultList()
+    return
+  }
+  
+  perfResultLoading.value = true
+  try {
+    const data = await getResultPage({
+      pageNum: 1,
+      pageSize: 20,
+      keyword: query
+    })
+    perfResultList.value = data.records.map((result: PerfResult) => ({
+      id: result.id,
+      employeeName: result.employeeName || '未知员工',
+      employeeNo: result.employeeNo || result.employeeId?.toString() || '-',
+      totalScore: result.totalScore ?? 0,
+      grade: result.grade,
+      period: result.period
+    }))
+  } catch (error) {
+    console.error('搜索绩效结果失败:', error)
+  } finally {
+    perfResultLoading.value = false
+  }
+}
+
 // 加载数据
 const loadData = async () => {
   loading.value = true
@@ -322,10 +413,47 @@ const loadData = async () => {
     const data = await getTrackPage(queryParams)
     tableData.value = data.records
     total.value = Number(data.total)
+    
+    // 如果绩效结果详情不存在，尝试获取
+    await fillPerfResultDetails()
   } catch (error) {
     console.error('加载绩效跟踪记录失败:', error)
   } finally {
     loading.value = false
+  }
+}
+
+// 填充绩效结果详情
+const fillPerfResultDetails = async () => {
+  // 收集所有需要查询的perfResultId
+  const perfResultIds = tableData.value
+    .filter(track => track.perfResultId && !track.perfResult)
+    .map(track => track.perfResultId)
+  
+  if (perfResultIds.length === 0) return
+  
+  try {
+    // 批量查询绩效结果（使用较大的pageSize获取所有）
+    const data = await getResultPage({ pageNum: 1, pageSize: 100 })
+    const resultMap = new Map(data.records.map(r => [r.id, r]))
+    
+    // 填充详情
+    for (const track of tableData.value) {
+      if (track.perfResultId && !track.perfResult) {
+        const result = resultMap.get(track.perfResultId)
+        if (result) {
+          track.perfResult = {
+            id: result.id,
+            employeeName: result.employeeName,
+            employeeNo: result.employeeNo,
+            totalScore: result.totalScore,
+            grade: result.grade
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('获取绩效结果详情失败:', error)
   }
 }
 
@@ -425,6 +553,20 @@ const handleTrackTypeChange = (type: string) => {
   }
 }
 
+// 绩效结果变更处理
+const handlePerfResultChange = (perfResultId: number) => {
+  if (!perfResultId) {
+    formData.employeeId = undefined
+    return
+  }
+  
+  // 从已加载的绩效结果列表中查找对应的员工ID
+  const result = perfResultList.value.find(item => item.id === perfResultId)
+  if (result && result.employeeId) {
+    formData.employeeId = result.employeeId
+  }
+}
+
 // 格式化日期时间
 const formatDateTime = (dateTime?: string) => {
   if (!dateTime) return '-'
@@ -460,8 +602,17 @@ const getProgressStatus = (progress: number) => {
   return 'exception'
 }
 
+// 进度颜色
+const getProgressColor = (progress?: number) => {
+  if (progress === undefined || progress === null) return '#909399'
+  if (progress >= 100) return '#67c23a'
+  if (progress >= 50) return '#409eff'
+  return '#e6a23c'
+}
+
 // 初始化加载
 onMounted(() => {
+  loadPerfResultList()
   loadData()
 })
 </script>

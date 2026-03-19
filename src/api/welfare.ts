@@ -112,7 +112,12 @@ export function updateWelfareRecord(data: WelfareRecord) {
 
 // 发放记录分页查询
 export function getWelfareRecordPage(params: WelfareRecordPageQuery) {
-  return request.get<WelfareRecordPageResult>('/salary/welfare/record/page', params)
+  // 过滤掉 undefined、空字符串和null的参数
+  const filteredParams = Object.fromEntries(
+    Object.entries(params).filter(([_, v]) => v !== undefined && v !== '' && v !== null)
+  )
+  console.log('getWelfareRecordPage->', filteredParams);
+  return request.get<WelfareRecordPageResult>('/salary/welfare/record/page', filteredParams)
 }
 
 // 删除发放记录

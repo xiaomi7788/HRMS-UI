@@ -45,8 +45,8 @@
       </el-form>
 
       <el-table :data="tableData" stripe v-loading="loading">
-        <el-table-column prop="empCode" label="工号" width="120" />
-        <el-table-column prop="empName" label="姓名" width="100" />
+        <el-table-column prop="employeeNo" label="工号" width="120" />
+        <el-table-column prop="employeeName" label="姓名" width="100" />
         <el-table-column prop="payMonth" label="薪酬月份" width="100" />
         <el-table-column prop="baseSalary" label="基本工资" width="120">
           <template #default="{ row }">

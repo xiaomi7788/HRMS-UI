@@ -72,7 +72,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="发起人">
-          <el-input v-model="queryParams.initiatorName" placeholder="请输入发起人姓名" clearable />
+          <el-input v-model="queryParams.keyword" placeholder="请输入发起人姓名" clearable style="width: 200px" />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleQuery">
@@ -160,14 +160,15 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="业务单据ID" prop="businessId">
-          <el-input-number v-model="startForm.businessId" :min="1" style="width: 100%" />
+        <el-form-item label="关联业务ID" prop="businessId">
+          <el-input-number v-model="startForm.businessId" :min="1" style="width: 100%" placeholder="请输入要关联的业务单据ID" />
+          <div class="form-tip">请输入要发起审批的业务记录ID（如请假记录ID、加班记录ID等）</div>
         </el-form-item>
         <el-form-item label="业务摘要" prop="businessTitle">
           <el-input v-model="startForm.businessTitle" placeholder="请输入业务摘要" />
         </el-form-item>
-        <el-form-item label="发起人ID" prop="initiatorId">
-          <el-input-number v-model="startForm.initiatorId" :min="1" style="width: 100%" />
+        <el-form-item label="发起人">
+          <el-input :value="userStore.userInfo?.nickname || userStore.userInfo?.username || '当前用户'" disabled />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -265,6 +266,9 @@ import {
   BUSINESS_TYPE_OPTIONS,
   PROCESS_STATUS_OPTIONS
 } from '@/api/workflow'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
 
 const loading = ref(false)
 const instanceList = ref<ProcessInstance[]>([])
@@ -295,15 +299,13 @@ const queryParams = reactive<ProcessInstancePageQuery>({
 const startForm = reactive({
   businessType: '',
   businessId: 0,
-  businessTitle: '',
-  initiatorId: 0
+  businessTitle: ''
 })
 
 const startFormRules = {
   businessType: [{ required: true, message: '请选择业务类型', trigger: 'change' }],
-  businessId: [{ required: true, message: '请输入业务单据ID', trigger: 'blur' }],
-  businessTitle: [{ required: true, message: '请输入业务摘要', trigger: 'blur' }],
-  initiatorId: [{ required: true, message: '请输入发起人ID', trigger: 'blur' }]
+  businessId: [{ required: true, message: '请输入关联的业务单据ID', trigger: 'blur' }],
+  businessTitle: [{ required: true, message: '请输入业务摘要', trigger: 'blur' }]
 }
 
 const approveForm = reactive({
@@ -395,7 +397,7 @@ function handleReset() {
   queryParams.pageNum = 1
   queryParams.businessType = ''
   queryParams.processStatus = undefined
-  queryParams.initiatorName = ''
+  queryParams.keyword = ''
   handleQuery()
 }
 
@@ -403,8 +405,7 @@ function handleStart() {
   Object.assign(startForm, {
     businessType: '',
     businessId: 0,
-    businessTitle: '',
-    initiatorId: 0
+    businessTitle: ''
   })
   startDialogVisible.value = true
 }
@@ -414,7 +415,12 @@ async function handleStartSubmit() {
   await startFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
-        await startProcessInstance(startForm)
+        // 自动获取当前登录用户的ID作为发起人
+        const submitData = {
+          ...startForm,
+          initiatorId: userStore.userInfo?.id
+        }
+        await startProcessInstance(submitData)
         ElMessage.success('流程发起成功')
         startDialogVisible.value = false
         handleQuery()
@@ -568,5 +574,12 @@ onMounted(() => {
   padding: 8px;
   background: #f5f7fa;
   border-radius: 4px;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
+  margin-top: 4px;
 }
 </style>

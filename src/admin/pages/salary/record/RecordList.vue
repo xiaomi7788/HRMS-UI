@@ -17,7 +17,7 @@
             <el-option
               v-for="emp in employeeList"
               :key="emp.id"
-              :label="`${emp.employeeNo} - ${emp.employeeName}`"
+              :label="`${emp.empCode} - ${emp.empName}`"
               :value="emp.id"
             />
           </el-select>

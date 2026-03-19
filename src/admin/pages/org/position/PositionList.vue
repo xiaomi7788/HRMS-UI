@@ -9,20 +9,17 @@
       </template>
 
       <div class="search-section">
-        <el-select
+        <el-tree-select
           v-model="searchForm.deptId"
+          :data="deptList"
+          :props="{ label: 'deptName', value: 'id' }"
+          :render-after-expand="false"
           placeholder="请选择部门"
           clearable
+          check-strictly
           style="width: 200px; margin-right: 10px;"
           @change="handleSearch"
-        >
-          <el-option
-            v-for="dept in deptList"
-            :key="dept.id"
-            :label="dept.deptName"
-            :value="dept.id"
-          />
-        </el-select>
+        />
         <el-input
           v-model="searchForm.keyword"
           placeholder="请输入岗位名称或编码"

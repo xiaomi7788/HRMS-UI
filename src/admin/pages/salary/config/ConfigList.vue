@@ -12,6 +12,12 @@
         <el-form-item label="关键词">
           <el-input v-model="queryParams.keyword" placeholder="员工姓名/工号" clearable style="width: 200px" />
         </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 120px">
+            <el-option label="启用" :value="1" />
+            <el-option label="停用" :value="0" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleQuery">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
@@ -171,7 +177,8 @@ const employeeList = ref<Employee[]>([])
 const queryParams = reactive<ConfigPageParams>({
   pageNum: 1,
   pageSize: 20,
-  keyword: undefined
+  keyword: '',
+  status: undefined as undefined | number
 })
 
 const formData = reactive<SalaryConfig>({
@@ -200,6 +207,8 @@ const loadData = async () => {
   try {
     const data = await getConfigPage(queryParams)
     tableData.value = data.records
+    console.log(await getConfigPage(queryParams));
+    
     total.value = Number(data.total)
   } catch (error) {
     console.error('加载薪资档案列表失败:', error)
@@ -224,6 +233,7 @@ const handleQuery = () => {
 
 const handleReset = () => {
   queryParams.keyword = undefined
+  queryParams.status = undefined
   queryParams.pageNum = 1
   loadData()
 }

@@ -164,23 +164,58 @@
         </div>
       </div>
 
-      <!-- 树形视图 -->
+      <!-- 树形视图 - 表格形式 -->
       <div v-else class="tree-view-container">
         <div class="tree-controls">
-          <el-button @click="expandAll">展开全部</el-button>
-          <el-button @click="collapseAll">收起全部</el-button>
+          <el-button type="primary" @click="toggleExpandAll">{{ isExpandAll ? '收起全部' : '展开全部' }}</el-button>
         </div>
-        <el-scrollbar height="500px">
-          <el-tree
-            ref="treeRef"
-            :data="treeData"
-            node-key="id"
-            :props="treeProps"
-            :expand-on-click-node="false"
-            :render-content="renderTreeNode"
-            default-expand-all
-          />
-        </el-scrollbar>
+        <el-table
+          ref="goalTableRef"
+          :data="treeData"
+          style="width: 100%"
+          row-key="id"
+          :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
+          :default-expand-all="isExpandAll"
+          border
+        >
+          <el-table-column prop="title" label="目标标题" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="objectiveType" label="类型" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag :type="getObjectiveTypeTagType(row.objectiveType)" size="small">
+                {{ getObjectiveTypeText(row.objectiveType) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="priority" label="优先级" width="80" align="center">
+            <template #default="{ row }">
+              <el-tag :type="getPriorityTagType(row.priority)" size="small">
+                {{ getPriorityText(row.priority) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="status" label="状态" width="90" align="center">
+            <template #default="{ row }">
+              <el-tag :type="getStatusTagType(row.status)" size="small">
+                {{ getStatusText(row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="employeeName" label="负责人" width="100" align="center" />
+          <el-table-column label="时间范围" width="180">
+            <template #default="{ row }">
+              {{ formatDate(row.startDate) }} ~ {{ formatDate(row.dueDate) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="progressPercent" label="进度" width="150" align="center">
+            <template #default="{ row }">
+              <el-progress 
+                :percentage="row.progressPercent || 0" 
+                :color="getProgressColor(row.progressPercent)"
+                :stroke-width="10"
+              />
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
     </el-card>
 
@@ -467,7 +502,8 @@ const loading = ref(false)
 const tableData = ref<PerfObjective[]>([])
 const total = ref(0)
 const treeData = ref<any[]>([])
-const treeRef = ref<any>()
+const goalTableRef = ref()
+const isExpandAll = ref(true)
 const activeView = ref('list')
 const dialogVisible = ref(false)
 const progressDialogVisible = ref(false)
@@ -583,7 +619,8 @@ const loadTreeData = async () => {
     const data = await getObjectiveTree({
       planId: queryParams.planId,
       employeeId: queryParams.employeeId,
-      period: queryParams.period
+      period: queryParams.period,
+      objectiveType: queryParams.objectiveType
     })
     treeData.value = data
   } catch (error) {
@@ -682,19 +719,33 @@ const handleAdd = async () => {
   formData.title = ''
   formData.description = ''
   
-  // 加载父目标列表
+  // 加载父目标列表（只查询顶级目标OBJECTIVE）
   try {
     const listData = await getObjectivePage({
       pageNum: 1,
       pageSize: 100,
-      objectiveType: 'OBJECTIVE'
+      objectiveType: 'OBJECTIVE',
+      parentOnly: true
     })
-    parentObjectiveList.value = listData.records.filter(obj => !obj.parentId)
+    // 编辑时排除当前目标，避免选择自己作为父目标
+    if (isEdit.value && currentObjectiveId.value) {
+      parentObjectiveList.value = listData.records.filter((obj: PerfObjective) => obj.id !== currentObjectiveId.value)
+    } else {
+      parentObjectiveList.value = listData.records
+    }
   } catch (error) {
     console.error('加载父目标列表失败:', error)
+    parentObjectiveList.value = []
   }
   
   dialogVisible.value = true
+}
+
+// 解析日期字符串为 Date 对象（用于编辑回显）
+const parseDateFromBackend = (dateStr: string | undefined): string | undefined => {
+  if (!dateStr) return undefined
+  // 后端返回的格式是 yyyy-MM-dd，直接返回即可，el-date-picker 会识别
+  return dateStr
 }
 
 // 编辑记录
@@ -702,20 +753,43 @@ const handleEdit = async (row: PerfObjective) => {
   isEdit.value = true
   currentObjectiveId.value = row.id
   
-  // 加载父目标列表
+  // 加载父目标列表（只查询顶级目标OBJECTIVE）
   try {
     const listData = await getObjectivePage({
       pageNum: 1,
       pageSize: 100,
-      objectiveType: 'OBJECTIVE'
+      objectiveType: 'OBJECTIVE',
+      parentOnly: true
     })
-    parentObjectiveList.value = listData.records.filter(obj => !obj.parentId)
+    // 排除当前目标，避免选择自己作为父目标
+    parentObjectiveList.value = listData.records.filter((obj: PerfObjective) => obj.id !== row.id)
   } catch (error) {
     console.error('加载父目标列表失败:', error)
+    parentObjectiveList.value = []
   }
   
-  Object.assign(formData, row)
+  // 复制数据并处理日期格式
+  Object.assign(formData, {
+    ...row,
+    startDate: parseDateFromBackend(row.startDate),
+    dueDate: parseDateFromBackend(row.dueDate)
+  })
   dialogVisible.value = true
+}
+
+// 格式化日期为 yyyy-MM-dd 格式
+const formatDateForSubmit = (date: any): string | undefined => {
+  if (!date) return undefined
+  if (typeof date === 'string') {
+    // 如果已经是字符串，取前10位
+    return date.substring(0, 10)
+  }
+  // 如果是 Date 对象，格式化
+  const d = new Date(date)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 // 保存记录
@@ -724,12 +798,17 @@ const handleSave = async () => {
   await formRef.value.validate(async (valid) => {
     if (valid) {
       try {
+        // 复制表单数据并格式化日期
+        const submitData = { ...formData }
+        submitData.startDate = formatDateForSubmit(submitData.startDate)
+        submitData.dueDate = formatDateForSubmit(submitData.dueDate)
+        
         if (isEdit.value && currentObjectiveId.value) {
-          formData.id = currentObjectiveId.value
-          await updateObjective(formData)
+          submitData.id = currentObjectiveId.value
+          await updateObjective(submitData)
           ElMessage.success('更新成功')
         } else {
-          await createObjective(formData)
+          await createObjective(submitData)
           ElMessage.success('创建成功')
         }
         dialogVisible.value = false
@@ -827,37 +906,6 @@ const handleDialogClose = () => {
   currentObjectiveId.value = undefined
 }
 
-// 树形视图控制
-const expandAll = () => {
-  if (treeRef.value) {
-    treeRef.value.expandAll()
-  }
-}
-
-const collapseAll = () => {
-  if (treeRef.value) {
-    treeRef.value.collapseAll()
-  }
-}
-
-// 自定义树节点渲染
-const renderTreeNode = (h: any, { node, data }: { node: Node, data: any }) => {
-  return h('div', { class: 'tree-node-content' }, [
-    h('span', { class: 'tree-node-title' }, node.label),
-    h('span', { class: 'tree-node-info' }, [
-      h('el-tag', { size: 'small', class: 'ml-2' }, getObjectiveTypeText(data.objectiveType)),
-      h('el-tag', { size: 'small', type: 'info', class: 'ml-2' }, data.employeeName || '未分配'),
-      h('el-progress', {
-        percentage: data.progressPercent || 0,
-        strokeWidth: 8,
-        showText: false,
-        style: { width: '100px', display: 'inline-block', marginLeft: '10px' }
-      }),
-      h('span', { class: 'ml-2' }, `${data.progressPercent || 0}%`)
-    ])
-  ])
-}
-
 // 格式化日期
 const formatDate = (date?: string) => {
   if (!date) return '-'
@@ -932,6 +980,23 @@ const getProgressStatus = (progress?: number) => {
   return 'exception'
 }
 
+// 进度颜色
+const getProgressColor = (progress?: number) => {
+  if (!progress || progress === 0) return '#909399'
+  if (progress >= 100) return '#67c23a'
+  if (progress >= 50) return '#409eff'
+  return '#e6a23c'
+}
+
+// 表格展开/收起
+const toggleExpandAll = () => {
+  isExpandAll.value = !isExpandAll.value
+  const rows = goalTableRef.value?.store.states.data.value || []
+  rows.forEach((row: any) => {
+    goalTableRef.value?.toggleRowExpansion(row, isExpandAll.value)
+  })
+}
+
 // 初始化加载
 onMounted(() => {
   loadPlanList()
@@ -977,27 +1042,135 @@ onMounted(() => {
 
 .tree-view-container {
   margin-top: 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
+  border-radius: 8px;
+  padding: 20px;
 }
 
 .tree-controls {
-  margin-bottom: 10px;
+  margin-bottom: 16px;
+  display: flex;
+  gap: 10px;
 }
 
-.tree-node-content {
+.tree-controls .el-button {
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  border: none;
+  color: #fff;
+  transition: all 0.3s ease;
+}
+
+.tree-controls .el-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+/* 树节点容器 */
+:deep(.el-tree-node__content) {
+  height: auto !important;
+  padding: 12px 8px;
+  margin: 4px 0;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-tree-node__content:hover) {
+  background: linear-gradient(135deg, #ecf5ff 0%, #f0f9ff 100%);
+  border-color: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.15);
+}
+
+:deep(.el-tree-node__content > .el-tree-node__expand-icon) {
+  padding: 6px;
+  color: #409eff;
+}
+
+:deep(.el-tree-node__content > .el-tree-node__expand-icon.is-leaf) {
+  color: transparent;
+}
+
+/* 树节点单行布局样式 */
+.tree-node-row {
   display: flex;
   align-items: center;
   width: 100%;
+  gap: 12px;
+  flex-wrap: nowrap;
 }
 
-.tree-node-title {
+.tree-node-label {
+  font-weight: 600;
+  font-size: 14px;
+  min-width: 150px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-node-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
   font-weight: 500;
-  margin-right: 10px;
+  border: 1px solid;
+  background: transparent;
+  white-space: nowrap;
 }
 
-.tree-node-info {
+.tree-node-text {
+  font-size: 12px;
+  color: #606266;
+  white-space: nowrap;
+}
+
+.tree-node-progress {
   display: flex;
   align-items: center;
-  flex-grow: 1;
+  gap: 8px;
+  min-width: 120px;
+}
+
+.progress-track {
+  flex: 1;
+  height: 6px;
+  background: #ebeef5;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-value {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 30px;
+}
+
+
+/* 操作按钮 */
+.tree-node-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+:deep(.el-tree-node__content:hover) .tree-node-actions {
+  opacity: 1;
+}
+
+:deep(.el-tree-node__content:hover) .tree-node-actions {
+  opacity: 1;
 }
 
 .progress-cell {

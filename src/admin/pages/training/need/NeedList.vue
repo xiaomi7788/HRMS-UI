@@ -246,7 +246,7 @@ import {
   type NeedPageParams
 } from '@/api/training'
 import { getEmployeePage } from '@/api/employee'
-import { getDeptPage } from '@/api/dept'
+import { getDeptTree } from '@/api/dept'
 
 // 列表数据
 const loading = ref(false)

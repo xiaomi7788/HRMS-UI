@@ -318,11 +318,11 @@
         label-width="120px"
       >
         <el-form-item label="员工">
-          <el-input :value="`${currentResult?.employeeNo} - ${currentResult?.employeeName}`" disabled />
+          <el-input :value="`${currentResult?.empCode || '-'} - ${currentResult?.empName || '-'}`" disabled />
         </el-form-item>
         
         <el-form-item label="当前得分">
-          <el-input :value="currentResult?.totalScore" disabled />
+          <el-input :value="currentResult?.totalScore || 0" disabled />
         </el-form-item>
         
         <el-form-item label="当前等级">
@@ -387,12 +387,14 @@ import {
   submitResult,
   updateResult,
   calibrateResult,
-  deleteResult,
   type PerfResult,
   type ResultPageParams
 } from '@/api/performance'
 import { getPlanPage, type PerfPlan, type PlanPageParams } from '@/api/performance'
 import { getEmployeePage, type Employee } from '@/api/employee'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
 
 const loading = ref(false)
 const tableData = ref<PerfResult[]>([])
@@ -591,12 +593,21 @@ const handleSave = async () => {
           }
         }
         
+        // 添加评估人和评估时间
+        const currentTime = new Date().toISOString().replace('T', ' ').substring(0, 19)
+        formData.evaluatorId = userStore.userInfo?.id
+        formData.evaluatorName = userStore.userInfo?.nickname || userStore.userInfo?.username
+        formData.evaluateTime = currentTime
+        
+        // 确保status值正确传递
+        const submitData = { ...formData }
+        
         if (isEdit.value && currentResult.value?.id) {
-          formData.id = currentResult.value.id
-          await updateResult(formData)
+          submitData.id = currentResult.value.id
+          await updateResult(submitData)
           ElMessage.success('更新成功')
         } else {
-          await submitResult(formData)
+          await submitResult(submitData)
           ElMessage.success('创建成功')
         }
         evaluateDialogVisible.value = false
@@ -639,13 +650,17 @@ const handleSaveCalibrate = async () => {
   })
 }
 
-// 删除评估
+// 删除评估（逻辑删除）
 const handleDelete = (row: PerfResult) => {
   ElMessageBox.confirm('确认删除该绩效评估吗？删除后将无法恢复', '提示', {
     type: 'warning'
   }).then(async () => {
     try {
-      await deleteResult(row.id!)
+      // 使用逻辑删除，通过更新status为-1
+      await updateResult({
+        id: row.id,
+        status: -1
+      } as PerfResult)
       ElMessage.success('删除成功')
       loadData()
     } catch (error) {

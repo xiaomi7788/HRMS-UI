@@ -19,6 +19,8 @@ export interface PerfResult {
   employeeId?: number
   employeeName?: string
   employeeNo?: string
+  empName?: string
+  empCode?: string
   deptName?: string
   kpiScore?: number
   behaviorScore?: number
@@ -45,6 +47,7 @@ export interface ResultPageParams {
   planId?: number
   employeeId?: number
   keyword?: string
+  status?: number
 }
 
 export interface PageResult<T> {
@@ -77,6 +80,8 @@ export const submitResult = (data: PerfResult) => {
 }
 
 export const updateResult = (data: PerfResult) => {
+  console.log('updateResult', data);
+
   return request.put('/performance/result', data)
 }
 

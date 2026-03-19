@@ -96,7 +96,7 @@ export interface ProcessInstancePageQuery {
   pageSize: number
   businessType?: string
   processStatus?: number
-  initiatorName?: string
+  keyword?: string
 }
 
 // 流程统计数据

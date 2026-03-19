@@ -309,7 +309,11 @@ export const deleteCheckin = (id: number) => {
 
 // 课程管理
 export const getCoursePage = (params: CoursePageParams) => {
-  return request.get<PageResult<TrainingCourse>>('/training/course/page', params)
+  // 过滤掉 undefined、空字符串和null的参数
+  const filteredParams = Object.fromEntries(
+    Object.entries(params).filter(([_, v]) => v !== undefined && v !== '' && v !== null)
+  )
+  return request.get<PageResult<TrainingCourse>>('/training/course/page', filteredParams)
 }
 
 export const createCourse = (data: TrainingCourse) => {

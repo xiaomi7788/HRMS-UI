@@ -95,7 +95,11 @@ export interface PageResult<T> {
 
 // 账户管理
 export const getAccountPage = (params: AccountPageParams) => {
-  return request.get<PageResult<SocialAccount>>('/salary/social/page', params)
+  // 过滤掉 undefined、空字符串和null的参数
+  const filteredParams = Object.fromEntries(
+    Object.entries(params).filter(([_, v]) => v !== undefined && v !== '' && v !== null)
+  )
+  return request.get<PageResult<SocialAccount>>('/salary/social/page', filteredParams)
 }
 
 export const createAccount = (data: SocialAccount) => {
@@ -106,8 +110,8 @@ export const updateAccount = (data: SocialAccount) => {
   return request.put('/salary/social', data)
 }
 
-export const stopAccount = (id: number) => {
-  return request.put(`/salary/social/${id}/stop`)
+export const stopAccount = (id: number, endMonth: string) => {
+  return request.put(`/salary/social/${id}/stop`, { endMonth })
 }
 
 export const deleteAccount = (id: number) => {

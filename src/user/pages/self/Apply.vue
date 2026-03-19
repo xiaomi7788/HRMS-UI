@@ -125,6 +125,17 @@
             <el-option label="病假" value="SICK" />
           </el-select>
         </el-form-item>
+        <el-form-item label="请假天数" prop="duration" v-if="applyForm.applyType === 0">
+          <el-input-number
+            v-model="applyForm.duration"
+            :min="0.5"
+            :step="0.5"
+            :precision="1"
+            :max="30"
+            placeholder="请输入请假天数"
+            style="width: 100%"
+          />
+        </el-form-item>
         <el-form-item label="开始时间" prop="startTime">
           <el-date-picker
             v-model="applyForm.startTime"
@@ -185,11 +196,14 @@ const applyForm = reactive<AttendanceApply>({
   applyType: 0,
   startTime: '',
   endTime: '',
-  reason: ''
+  reason: '',
+  duration: 1
 })
 
 const applyRules = {
   applyType: [{ required: true, message: '请选择申请类型', trigger: 'change' }],
+  leaveType: [{ required: true, message: '请选择假期类型', trigger: 'change' }],
+  duration: [{ required: true, message: '请输入请假天数', trigger: 'blur' }],
   startTime: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
   endTime: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
   reason: [{ required: true, message: '请输入申请原因', trigger: 'blur' }]
@@ -198,6 +212,61 @@ const applyRules = {
 function formatDateTime(date: string) {
   if (!date) return '-'
   return new Date(date).toLocaleString('zh-CN')
+}
+
+// 格式化时间字段，转换为后端期望的格式
+function formatDateForBackend(date: Date | string) {
+  if (!date) return ''
+  
+  let dateObj: Date
+  if (date instanceof Date) {
+    dateObj = date
+  } else {
+    // 如果已经是字符串，检查格式
+    if (typeof date === 'string') {
+      // 如果已经是正确的格式，直接返回
+      if (date.includes('T') && date.includes(':') || date.includes(' ') && date.includes(':')) {
+        return date
+      }
+      dateObj = new Date(date)
+    } else {
+      return ''
+    }
+  }
+  
+  // 防止无效日期
+  if (isNaN(dateObj.getTime())) {
+    return ''
+  }
+  
+  // 获取本地时间的各个部分
+  const year = dateObj.getFullYear()
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+  const day = String(dateObj.getDate()).padStart(2, '0')
+  const hours = String(dateObj.getHours()).padStart(2, '0')
+  const minutes = String(dateObj.getMinutes()).padStart(2, '0')
+  const seconds = String(dateObj.getSeconds()).padStart(2, '0')
+  const milliseconds = String(dateObj.getMilliseconds()).padStart(3, '0')
+  
+  // 尝试格式1：ISO格式带毫秒（yyyy-MM-dd'T'HH:mm:ss.SSS）
+  // 这是LocalDateTime的标准格式
+  const isoWithMillis = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+  
+  // 尝试格式2：ISO格式不带毫秒（yyyy-MM-dd'T'HH:mm:ss）
+  const isoWithoutMillis = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+  
+  // 尝试格式3：时间戳（毫秒数）
+  const timestamp = dateObj.getTime()
+  
+  console.log(`时间格式化测试:
+    原始值: ${date}
+    ISO带毫秒: ${isoWithMillis}
+    ISO不带毫秒: ${isoWithoutMillis}
+    时间戳: ${timestamp}`)
+  
+  // 根据错误信息，使用空格分隔符格式
+  // LocalDateTime支持 yyyy-MM-dd HH:mm:ss 或 yyyy-MM-dd HH:mm:ss.SSS 格式
+  return isoWithMillis
 }
 
 function getTypeName(type: number) {
@@ -230,6 +299,18 @@ function getStatusName(status: number) {
   return map[status] || '未知'
 }
 
+function getleaveTypeName(type: string|undefined) {
+  const map: Record<string, string> = {
+    'ANNUAL': '年假',
+    'PERSONAL': '事假',
+    'SICK': '病假'
+  }
+  if (type!==undefined) {
+    return map[type]
+  }
+  return '数据错误'
+}
+
 function getStatusTagType(status: number) {
   const map: Record<number, string> = {
     0: 'warning',
@@ -242,7 +323,7 @@ function getStatusTagType(status: number) {
 
 async function handleQuery() {
   loading.value = true
-  try {
+  try {    
     const result = await getAttendanceApplies(queryParams)
     applyList.value = result.records || []
     total.value = result.total || 0
@@ -264,9 +345,15 @@ function handleApply() {
   applyDialog.value = true
   applyForm.applyType = 0
   applyForm.leaveType = ''
+  applyForm.duration = 1
   applyForm.startTime = ''
   applyForm.endTime = ''
   applyForm.reason = ''
+  
+  // 添加一个监听器来查看el-date-picker返回的值
+  setTimeout(() => {
+    console.log('对话框打开，可以查看时间选择器的值')
+  }, 100)
 }
 
 async function handleSubmitApply() {
@@ -274,11 +361,24 @@ async function handleSubmitApply() {
   await applyFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
-        await submitAttendanceApply(applyForm)
+        // 格式化时间字段，去掉时区信息（LocalDateTime格式）
+        const formattedData = {
+          ...applyForm,
+          startTime: applyForm.startTime ? formatDateForBackend(applyForm.startTime) : '',
+          endTime: applyForm.endTime ? formatDateForBackend(applyForm.endTime) : ''
+        }
+        formattedData.leaveType = getleaveTypeName(formattedData.leaveType)
+        console.log('提交的数据:', formattedData)
+        console.log('startTime原始值:', applyForm.startTime)
+        console.log('startTime格式化后:', formattedData.startTime)
+        console.log('endTime原始值:', applyForm.endTime)
+        console.log('endTime格式化后:', formattedData.endTime)
+        await submitAttendanceApply(formattedData)
         ElMessage.success('申请提交成功')
         applyDialog.value = false
         handleQuery()
       } catch (error) {
+        console.error('提交失败:', error)
         ElMessage.error('申请提交失败')
       }
     }

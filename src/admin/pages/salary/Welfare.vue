@@ -103,13 +103,20 @@
                 新增发放记录
               </el-button>
               <div class="search-form">
-                <el-input
-                  v-model="recordQuery.employeeName"
+                <el-select
+                  v-model="recordQuery.employeeId"
                   placeholder="员工姓名"
                   clearable
+                  filterable
                   style="width: 150px"
-                  @keyup.enter="searchEmployee"
-                />
+                >
+                  <el-option
+                    v-for="emp in employeeOptions"
+                    :key="emp.id"
+                    :label="emp.empName"
+                    :value="emp.id"
+                  />
+                </el-select>
                 <el-select
                   v-model="recordQuery.itemId"
                   placeholder="福利项目"
@@ -416,7 +423,7 @@ const welfareItems = ref<WelfareItem[]>([])
 const employeeOptions = ref<Employee[]>([])
 const employeeCache = ref<Map<number, Employee>>(new Map())
 const itemCache = ref<Map<number, WelfareItem>>(new Map())
-const recordQuery = reactive<WelfareRecordPageQuery & { employeeName?: string }>({
+const recordQuery = reactive<WelfareRecordPageQuery & { employeeId?: number }>({
   pageNum: 1,
   pageSize: 10
 })
@@ -528,7 +535,7 @@ async function loadRecords() {
       pageSize: recordQuery.pageSize
     }
     if (recordQuery.employeeId) {
-      params.employeeId = recordQuery.employeeId
+      params.employeeId = Number(recordQuery.employeeId)
     }
     if (recordQuery.itemId) {
       params.itemId = recordQuery.itemId
@@ -552,30 +559,10 @@ async function loadRecords() {
 function resetRecordQuery() {
   recordQuery.pageNum = 1
   recordQuery.employeeId = undefined
-  recordQuery.employeeName = undefined
   recordQuery.itemId = undefined
   recordQuery.grantMonth = undefined
   recordQuery.status = undefined
   loadRecords()
-}
-
-async function searchEmployee() {
-  if (!recordQuery.employeeName) return
-  try {
-    const result = await getEmployeePage({
-      pageNum: 1,
-      pageSize: 10,
-      employeeName: recordQuery.employeeName
-    })
-    if (result.records && result.records.length > 0) {
-      recordQuery.employeeId = result.records[0].id
-      loadRecords()
-    } else {
-      ElMessage.warning('未找到该员工')
-    }
-  } catch (error) {
-    ElMessage.error('搜索员工失败')
-  }
 }
 
 async function handleAddRecord() {

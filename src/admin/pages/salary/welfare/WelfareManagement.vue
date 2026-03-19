@@ -132,6 +132,7 @@
                 placeholder="请选择员工"
                 clearable
                 style="width: 200px"
+                @clear="handleRecordQuery"
               />
             </el-form-item>
             <el-form-item label="福利项目">
