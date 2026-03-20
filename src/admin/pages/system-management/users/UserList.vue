@@ -107,9 +107,6 @@
             <el-radio :value="0">禁用</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="关联员工ID">
-          <el-input-number v-model="currentUser.employeeId" :min="0" />
-        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -322,8 +319,11 @@ const handleSave = async () => {
           await updateUser(currentUser)
           ElMessage.success('更新用户成功')
         } else {
-          await createUser(currentUser)
-          ElMessage.success('新增用户成功')
+          // 新增用户时，不传递employeeId，让后端自动创建员工档案
+          const userData = { ...currentUser }
+          delete userData.employeeId
+          await createUser(userData)
+          ElMessage.success('新增用户成功，已自动创建员工档案')
         }
         dialogVisible.value = false
         loadUserList()

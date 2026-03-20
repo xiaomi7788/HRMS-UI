@@ -122,7 +122,7 @@ async function handleQuery() {
   try {
     const result = await getAttendanceRecords(queryParams)
     recordList.value = result.records || []
-    total.value = result.total || 0
+    total.value = Number(result.total || 0)
   } catch (error) {
     ElMessage.error('获取考勤记录失败')
   } finally {

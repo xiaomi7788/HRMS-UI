@@ -19,7 +19,21 @@
           </el-select>
         </el-form-item>
         <el-form-item label="员工">
-          <el-input v-model="queryParams.keyword" placeholder="姓名/工号" clearable style="width: 200px" />
+          <el-select
+            v-model="queryParams.employeeId"
+            placeholder="选择员工"
+            clearable
+            filterable
+            allow-create
+            style="width: 200px"
+          >
+            <el-option
+              v-for="emp in employeeList"
+              :key="emp.id"
+              :label="`${emp.empCode} - ${emp.empName}`"
+              :value="emp.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleQuery">查询</el-button>
@@ -161,12 +175,14 @@ import {
   type PerfPlan,
   type ResultPageParams
 } from '@/api/performance'
+import { getEmployeePage, type Employee } from '@/api/employee'
 
 const route = useRoute()
 const loading = ref(false)
 const tableData = ref<PerfResult[]>([])
 const total = ref(0)
 const planList = ref<PerfPlan[]>([])
+const employeeList = ref<Employee[]>([])
 const evaluateDialogVisible = ref(false)
 const calibrateDialogVisible = ref(false)
 const evaluateFormRef = ref<FormInstance>()
@@ -177,6 +193,7 @@ const queryParams = reactive<ResultPageParams>({
   pageNum: 1,
   pageSize: 20,
   planId: undefined as any,
+  employeeId: undefined as any,
   keyword: ''
 })
 
@@ -218,10 +235,26 @@ const loadPlanList = async () => {
   }
 }
 
+const loadEmployeeList = async () => {
+  try {
+    const data = await getEmployeePage({ pageNum: 1, pageSize: 1000, workStatus: 2 })
+    employeeList.value = data.records
+  } catch (error) {
+    console.error('加载员工列表失败:', error)
+  }
+}
+
 const loadData = async () => {
   loading.value = true
   try {
-    const data = await getResultPage(queryParams)
+    const params: ResultPageParams = {
+      pageNum: queryParams.pageNum,
+      pageSize: queryParams.pageSize,
+      planId: queryParams.planId,
+      employeeId: queryParams.employeeId,
+      status: queryParams.status
+    }
+    const data = await getResultPage(params)
     console.log('绩效评估结果数据:', data)
     console.log('数据记录:', data.records)
     tableData.value = data.records
@@ -240,7 +273,9 @@ const handleQuery = () => {
 
 const handleReset = () => {
   queryParams.planId = undefined
+  queryParams.employeeId = undefined
   queryParams.keyword = ''
+  queryParams.status = undefined
   queryParams.pageNum = 1
   loadData()
 }
@@ -350,6 +385,7 @@ const handleCurrentChange = () => {
 
 onMounted(() => {
   loadPlanList()
+  loadEmployeeList()
   loadData()
 })
 </script>

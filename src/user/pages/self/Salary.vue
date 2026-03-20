@@ -90,7 +90,7 @@ const total = ref(0)
 
 const queryParams = reactive({
   pageNum: 1,
-  pageSize: 12
+  pageSize: 10
 })
 
 function formatMoney(value: any) {
@@ -121,7 +121,7 @@ async function handleQuery() {
   try {
     const result = await getSalaryRecords(queryParams)
     recordList.value = result.records || []
-    total.value = result.total || 0
+    total.value = Number(result.total || 0)
   } catch (error) {
     ElMessage.error('获取薪酬记录失败')
   } finally {

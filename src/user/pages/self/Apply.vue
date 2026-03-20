@@ -323,10 +323,10 @@ function getStatusTagType(status: number) {
 
 async function handleQuery() {
   loading.value = true
-  try {    
+  try {
     const result = await getAttendanceApplies(queryParams)
     applyList.value = result.records || []
-    total.value = result.total || 0
+    total.value = Number(result.total || 0)
   } catch (error) {
     ElMessage.error('获取申请列表失败')
   } finally {

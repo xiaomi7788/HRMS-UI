@@ -25,7 +25,11 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="rating" label="评级" width="100" />
+        <el-table-column prop="rating" label="评级" width="100">
+          <template #default="{ row }">
+            {{ getRatingName(row.rating) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="evaluatorName" label="评估人" width="100" />
         <el-table-column prop="evaluateTime" label="评估时间" width="180">
           <template #default="{ row }">
@@ -89,7 +93,7 @@
             {{ currentResult.grade }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="评级">{{ currentResult.rating }}</el-descriptions-item>
+        <el-descriptions-item label="评级">{{ getRatingName(currentResult.rating) }}</el-descriptions-item>
         <el-descriptions-item label="评估人">{{ currentResult.evaluatorName }}</el-descriptions-item>
         <el-descriptions-item label="评估时间">{{ formatDateTime(currentResult.evaluateTime) }}</el-descriptions-item>
         <el-descriptions-item label="评估意见">{{ currentResult.comment }}</el-descriptions-item>
@@ -159,6 +163,16 @@ function getStatusTagType(status: number) {
   return map[status] || ''
 }
 
+function getRatingName(rating: string) {
+  const map: Record<string, string> = {
+    'EXCELLENT': '优秀',
+    'GOOD': '良好',
+    'NEEDS_IMPROVEMENT': '需改进',
+    'UNSATISFACTORY': '不满意'
+  }
+  return map[rating] || rating || '-'
+}
+
 function handleView(row: PerformanceResult) {
   currentResult.value = row
   detailDialog.value = true
@@ -169,7 +183,7 @@ async function handleQuery() {
   try {
     const result = await getPerformanceResults(queryParams)
     resultList.value = result.records || []
-    total.value = result.total || 0
+    total.value = Number(result.total || 0)
   } catch (error) {
     ElMessage.error('获取绩效结果失败')
   } finally {

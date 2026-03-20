@@ -72,8 +72,10 @@ async function loadProfile() {
     profile.value = await getSelfProfile()
     form.value.phone = profile.value.phone
     form.value.email = profile.value.email
-  } catch (error) {
-    ElMessage.error('获取个人档案失败')
+  } catch (error: any) {
+    console.error('获取个人档案失败:', error)
+    const errorMsg = error?.response?.data?.msg || error?.message || '获取个人档案失败'
+    ElMessage.error(errorMsg)
   }
 }
 
